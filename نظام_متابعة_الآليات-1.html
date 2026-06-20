@@ -1,0 +1,2264 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>نظام متابعة الآليات والسائقين</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
+
+:root {
+  --primary:       #0d2137;
+  --primary-mid:   #163352;
+  --primary-light: #1e4a75;
+  --accent:        #d4890a;
+  --accent-light:  #f0a820;
+  --success:       #1a8a4a;
+  --warning:       #c47a00;
+  --danger:        #b52020;
+  --info:          #1464a0;
+  --purple:        #6a3fa0;
+  --teal:          #0a7a80;
+
+  --bg-grad: linear-gradient(150deg,#0d2137 0%,#1a3f65 55%,#0d3a52 100%);
+  --card:    #ffffff;
+  --sidebar: #0a1a2c;
+  --text:    #1a2a3a;
+  --text-muted: #5a7080;
+  --border:  #d0dce8;
+  --radius:  10px;
+  --radius-sm: 6px;
+  --shadow:  0 2px 12px rgba(13,33,55,.10);
+  --shadow-md: 0 6px 24px rgba(13,33,55,.16);
+  --transition: all .22s ease;
+}
+.dark {
+  --card:   #0f1f30;
+  --text:   #d8e8f4;
+  --text-muted: #6890a8;
+  --border: #1a3050;
+  --shadow: 0 2px 12px rgba(0,0,0,.35);
+  --shadow-md: 0 6px 24px rgba(0,0,0,.5);
+  --bg-grad: linear-gradient(150deg,#060e17 0%,#0d2137 55%,#071e2e 100%);
+  --sidebar: #050e18;
+}
+
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Cairo',sans-serif;background:var(--bg-grad);background-attachment:fixed;color:var(--text);min-height:100vh;font-weight:600;}
+
+/* ─── SVG ICON HELPER ─── */
+.ico{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;}
+.ico svg{display:block;}
+
+/* ─── SIDEBAR ─── */
+.sidebar{width:252px;background:var(--sidebar);position:fixed;top:0;right:0;height:100vh;z-index:1000;display:flex;flex-direction:column;overflow-y:auto;border-left:1px solid rgba(255,255,255,.05);}
+.sidebar::-webkit-scrollbar{width:4px;}
+.sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:4px;}
+
+.sb-head{padding:22px 18px 18px;border-bottom:1px solid rgba(255,255,255,.07);}
+.sb-logo{display:flex;align-items:center;gap:10px;}
+.sb-logo-box{width:38px;height:38px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.sb-logo-box svg{width:22px;height:22px;fill:#fff;}
+.sb-logo-text h2{font-size:13px;font-weight:900;color:#fff;line-height:1.3;}
+.sb-logo-text span{font-size:10px;color:rgba(255,255,255,.35);letter-spacing:.5px;}
+
+.sb-section{padding:14px 18px 4px;font-size:9px;font-weight:700;color:rgba(255,255,255,.28);letter-spacing:1.5px;text-transform:uppercase;}
+
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 18px;cursor:pointer;color:rgba(255,255,255,.6);font-size:13px;font-weight:600;border-right:3px solid transparent;transition:var(--transition);}
+.nav-item:hover{background:rgba(255,255,255,.05);color:#fff;}
+.nav-item.active{background:rgba(212,137,10,.12);color:var(--accent-light);border-right-color:var(--accent);}
+.nav-item .n-ico{width:20px;height:20px;opacity:.7;}
+.nav-item.active .n-ico{opacity:1;}
+
+/* ─── MAIN ─── */
+.main{margin-right:252px;display:flex;flex-direction:column;min-height:100vh;}
+
+/* ─── TOPBAR ─── */
+.topbar{height:56px;background:rgba(255,255,255,.95);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid rgba(255,255,255,.6);display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:100;box-shadow:0 1px 10px rgba(13,33,55,.10);}
+.dark .topbar{background:rgba(5,14,24,.9);border-bottom:1px solid rgba(255,255,255,.05);}
+.topbar-title{font-size:15px;font-weight:900;color:var(--text);}
+.topbar-right{display:flex;align-items:center;gap:10px;}
+
+.sb-toggle{display:none;background:none;border:none;cursor:pointer;padding:6px;color:var(--text);}
+
+/* ─── CONTENT ─── */
+.content{padding:24px;flex:1;}
+.section{display:none;}
+.section.active{display:block;}
+
+/* ─── CARD ─── */
+.card{background:rgba(255,255,255,.97);border-radius:var(--radius);border:1px solid rgba(255,255,255,.8);box-shadow:var(--shadow-md);padding:22px;}
+.dark .card{background:var(--card);border-color:var(--border);}
+.card+.card{margin-top:16px;}
+.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:10px;}
+.card-title{font-size:14px;font-weight:900;color:var(--text);display:flex;align-items:center;gap:8px;}
+.card-title svg{width:18px;height:18px;opacity:.7;}
+
+/* ─── STAT CARDS ─── */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:20px;}
+.stat-card{border-radius:var(--radius);padding:20px 16px;cursor:pointer;position:relative;overflow:hidden;transition:var(--transition);box-shadow:0 4px 18px rgba(0,0,0,.20);}
+.stat-card:hover{transform:translateY(-4px);box-shadow:0 10px 32px rgba(0,0,0,.30);}
+.stat-card:active{transform:scale(.97);}
+.stat-card::before{content:'';position:absolute;top:-18px;left:-18px;width:70px;height:70px;border-radius:50%;background:rgba(255,255,255,.10);}
+.stat-card::after{content:'';position:absolute;bottom:-10px;right:-10px;width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.06);}
+.sc-blue  {background:linear-gradient(135deg,#1255a0,#2e8edb);}
+.sc-green {background:linear-gradient(135deg,#0e6632,#1faa5a);}
+.sc-red   {background:linear-gradient(135deg,#8a1010,#d43030);}
+.sc-orange{background:linear-gradient(135deg,#9a4400,#e07010);}
+.sc-purple{background:linear-gradient(135deg,#4a1880,#8a40d0);}
+.sc-teal  {background:linear-gradient(135deg,#054e54,#0fa8b0);}
+.stat-icon-box{width:42px;height:42px;background:rgba(255,255,255,.18);border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:12px;}
+.stat-icon-box svg{width:22px;height:22px;fill:#fff;}
+.stat-num{font-size:36px;font-weight:900;color:#fff;line-height:1;text-shadow:0 2px 6px rgba(0,0,0,.2);}
+.stat-label{font-size:12px;color:rgba(255,255,255,.82);margin-top:5px;font-weight:700;}
+.stat-hint{font-size:10px;color:rgba(255,255,255,.50);margin-top:3px;}
+
+/* ─── BUTTONS ─── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--radius-sm);border:none;cursor:pointer;font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;transition:var(--transition);white-space:nowrap;}
+.btn svg{width:15px;height:15px;flex-shrink:0;}
+.btn-primary{background:var(--primary-light);color:#fff;}
+.btn-primary:hover{background:#1e5a8a;box-shadow:var(--shadow);}
+.btn-success{background:var(--success);color:#fff;}
+.btn-success:hover{background:#157a3c;}
+.btn-danger{background:var(--danger);color:#fff;}
+.btn-danger:hover{background:#8a1818;}
+.btn-warning{background:var(--warning);color:#fff;}
+.btn-warning:hover{background:#a06600;}
+.btn-info{background:var(--info);color:#fff;}
+.btn-outline{background:transparent;border:1.5px solid var(--border);color:var(--text);}
+.btn-outline:hover{border-color:var(--primary-light);color:var(--primary-light);}
+.btn-sm{padding:5px 11px;font-size:12px;}
+.btn-icon{padding:6px;border-radius:50%;background:transparent;border:1.5px solid var(--border);color:var(--text);}
+.btn-icon:hover{border-color:var(--primary-light);}
+.btn-icon svg{width:14px;height:14px;}
+
+/* ─── SEARCH BOX ─── */
+.search-wrap{position:relative;}
+.search-wrap svg{position:absolute;right:10px;top:50%;transform:translateY(-50%);width:14px;height:14px;opacity:.45;pointer-events:none;}
+.search-wrap input{padding-right:32px;width:190px;}
+
+/* ─── FORMS ─── */
+.form-group{margin-bottom:14px;}
+.form-label{display:block;font-size:12px;font-weight:700;color:var(--text);margin-bottom:5px;}
+.form-control{width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:'Cairo',sans-serif;font-size:13px;color:var(--text);background:var(--card);outline:none;transition:var(--transition);}
+.dark .form-control{background:#0d1f30;color:var(--text);}
+.form-control:focus{border-color:var(--primary-light);box-shadow:0 0 0 3px rgba(30,74,117,.15);}
+select.form-control{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235a7080' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:left 10px center;background-size:14px;padding-left:30px;}
+textarea.form-control{resize:vertical;min-height:76px;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+@media(max-width:560px){.form-row{grid-template-columns:1fr;}}
+
+/* ─── TABLE ─── */
+.table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead tr{background:var(--primary-mid);}
+thead th{padding:11px 13px;font-weight:700;color:#fff;text-align:right;white-space:nowrap;font-size:12px;}
+tbody tr{border-bottom:1px solid var(--border);transition:var(--transition);}
+tbody tr:hover{background:rgba(30,74,117,.04);}
+.dark tbody tr:hover{background:rgba(255,255,255,.03);}
+tbody td{padding:9px 13px;vertical-align:middle;font-size:13px;}
+
+/* ─── BADGE ─── */
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;}
+.badge-open    {background:#fce8e8;color:#a01818;}
+.badge-progress{background:#fef3e0;color:#a06000;}
+.badge-done    {background:#e0f5ea;color:#0e6632;}
+.badge-overdue {background:#b52020;color:#fff;}
+.badge-duesoon {background:#c47a00;color:#fff;}
+
+/* ─── VEHICLE CARDS ─── */
+.vehicles-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;}
+.v-card{background:rgba(255,255,255,.97);border-radius:var(--radius);border:1px solid rgba(255,255,255,.8);box-shadow:var(--shadow);overflow:hidden;transition:var(--transition);}
+.dark .v-card{background:var(--card);border-color:var(--border);}
+.v-card:hover{box-shadow:var(--shadow-md);transform:translateY(-3px);}
+.v-img{width:100%;height:130px;background:linear-gradient(135deg,#e8f0f8,#d0e0f0);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;}
+.dark .v-img{background:linear-gradient(135deg,#0d1f30,#132840);}
+.v-img img{width:100%;height:100%;object-fit:cover;}
+.v-img svg{width:56px;height:56px;opacity:.25;fill:var(--primary-mid);}
+.v-body{padding:13px;}
+.v-num{font-size:10px;color:var(--text-muted);font-weight:700;letter-spacing:.5px;text-transform:uppercase;}
+.v-name{font-size:14px;font-weight:900;color:var(--text);margin:3px 0 6px;}
+.v-driver{font-size:11.5px;color:var(--info);display:flex;align-items:center;gap:5px;}
+.v-driver svg{width:13px;height:13px;fill:currentColor;}
+.v-notes{font-size:11px;color:var(--text-muted);margin-top:4px;}
+.v-actions{display:flex;gap:6px;margin-top:10px;}
+
+/* ─── CHARTS ─── */
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px;}
+@media(max-width:760px){.charts-grid{grid-template-columns:1fr;}}
+.chart-card{background:rgba(255,255,255,.97);border-radius:var(--radius);border:1px solid rgba(255,255,255,.8);box-shadow:var(--shadow);padding:18px;}
+.dark .chart-card{background:var(--card);border-color:var(--border);}
+.chart-title{font-size:13px;font-weight:900;color:var(--text);margin-bottom:12px;display:flex;align-items:center;gap:7px;}
+.chart-title svg{width:16px;height:16px;opacity:.6;}
+
+/* ─── TABS ─── */
+.tabs{display:flex;gap:2px;background:rgba(0,0,0,.06);padding:3px;border-radius:var(--radius-sm);margin-bottom:18px;flex-wrap:wrap;}
+.dark .tabs{background:rgba(255,255,255,.05);}
+.tab{padding:7px 14px;border-radius:5px;cursor:pointer;font-size:12px;font-weight:700;color:var(--text-muted);transition:var(--transition);}
+.tab.active{background:var(--card);color:var(--primary-light);box-shadow:0 1px 6px rgba(0,0,0,.10);}
+
+/* ─── TOGGLE ─── */
+.toggle{width:42px;height:22px;background:#c0cdd8;border-radius:20px;cursor:pointer;position:relative;transition:var(--transition);flex-shrink:0;}
+.toggle.on{background:var(--accent);}
+.toggle::after{content:'';position:absolute;top:3px;right:3px;width:16px;height:16px;background:#fff;border-radius:50%;transition:var(--transition);box-shadow:0 1px 4px rgba(0,0,0,.2);}
+.toggle.on::after{right:unset;left:3px;}
+
+/* ─── MODAL ─── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:2000;justify-content:center;align-items:center;padding:14px;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--card);border-radius:var(--radius);width:100%;max-width:540px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.30);animation:slideUp .22s ease;}
+@keyframes slideUp{from{opacity:0;transform:translateY(28px);}to{opacity:1;transform:translateY(0);}}
+.modal-header{padding:18px 22px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.modal-title{font-size:15px;font-weight:900;color:var(--text);display:flex;align-items:center;gap:8px;}
+.modal-title svg{width:17px;height:17px;opacity:.65;}
+.modal-body{padding:18px 22px;}
+.modal-footer{padding:14px 22px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;}
+
+/* ─── IMAGE UPLOAD ─── */
+.img-upload-area{border:2px dashed var(--border);border-radius:var(--radius);padding:22px;text-align:center;cursor:pointer;transition:var(--transition);}
+.img-upload-area:hover{border-color:var(--primary-light);background:rgba(30,74,117,.03);}
+.img-upload-area svg{width:36px;height:36px;opacity:.3;margin-bottom:8px;}
+.img-upload-area p{font-size:12px;color:var(--text-muted);}
+
+/* ─── HISTORY ─── */
+.history-item{padding:10px 14px;border-right:3px solid var(--accent);background:rgba(212,137,10,.05);border-radius:0 var(--radius-sm) var(--radius-sm) 0;margin-bottom:7px;}
+.dark .history-item{background:rgba(212,137,10,.08);}
+.history-text{font-size:12.5px;font-weight:700;color:var(--text);}
+.history-date{font-size:11px;color:var(--text-muted);margin-top:2px;}
+
+/* ─── REPORT FILTERS ─── */
+.report-filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:flex-end;}
+.report-filters .form-group{margin:0;}
+
+/* ─── LIGHTBOX ─── */
+.lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:5000;justify-content:center;align-items:center;}
+.lightbox.open{display:flex;}
+.lightbox img{max-width:90vw;max-height:90vh;border-radius:var(--radius);}
+.lb-close{position:absolute;top:18px;left:18px;width:36px;height:36px;background:rgba(255,255,255,.12);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.lb-close svg{width:16px;height:16px;fill:#fff;}
+
+/* ─── TOAST ─── */
+.toast-box{position:fixed;top:18px;left:18px;z-index:9999;display:flex;flex-direction:column;gap:7px;}
+.toast{background:var(--primary-mid);color:#fff;padding:11px 16px;border-radius:var(--radius-sm);font-size:13px;font-weight:700;box-shadow:var(--shadow-md);display:flex;align-items:center;gap:8px;min-width:210px;animation:toastIn .25s ease;}
+.toast svg{width:15px;height:15px;flex-shrink:0;}
+.toast.t-success{background:var(--success);}
+.toast.t-danger{background:var(--danger);}
+.toast.t-warning{background:var(--warning);}
+.toast.t-info{background:var(--info);}
+@keyframes toastIn{from{opacity:0;transform:translateX(-24px);}to{opacity:1;transform:translateX(0);}}
+
+/* ─── ALERT BANNER ─── */
+.alert-banner{display:flex;align-items:center;gap:10px;padding:13px 16px;border-radius:var(--radius);background:linear-gradient(135deg,#8a1010,#c43030);color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(180,30,30,.25);margin-bottom:12px;transition:var(--transition);}
+.alert-banner:hover{transform:translateY(-2px);}
+.alert-banner.alert-amber{background:linear-gradient(135deg,#9a5500,#d4890a);box-shadow:0 4px 16px rgba(196,122,0,.25);}
+.alert-banner svg{width:18px;height:18px;flex-shrink:0;}
+
+/* ─── GLOBAL SEARCH RESULTS ─── */
+.gsr{display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);box-shadow:var(--shadow-md);max-height:340px;overflow-y:auto;z-index:500;text-align:right;}
+.gsr-group{padding:7px 12px 3px;font-size:10px;font-weight:800;color:var(--text-muted);letter-spacing:.5px;text-transform:uppercase;}
+.gsr-item{padding:8px 12px;font-size:12.5px;font-weight:700;color:var(--text);cursor:pointer;border-top:1px solid var(--border);}
+.gsr-item:hover{background:rgba(30,74,117,.06);}
+.dark .gsr-item:hover{background:rgba(255,255,255,.04);}
+.gsr-empty{padding:14px;font-size:12px;color:var(--text-muted);text-align:center;}
+
+/* ─── LOGIN SCREEN ─── */
+#loginScreen{position:fixed;inset:0;z-index:10000;background:var(--bg-grad);display:flex;align-items:center;justify-content:center;padding:20px;}
+.login-card{background:rgba(255,255,255,.98);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.35);padding:32px 26px;width:100%;max-width:380px;}
+.dark .login-card{background:var(--card);}
+.login-logo{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:22px;}
+.login-logo-box{width:54px;height:54px;background:var(--accent);border-radius:12px;display:flex;align-items:center;justify-content:center;}
+.login-logo-box svg{width:30px;height:30px;fill:#fff;}
+.login-logo h1{font-size:15px;font-weight:900;color:var(--text);text-align:center;}
+.login-logo span{font-size:11px;color:var(--text-muted);}
+.login-err{background:#fce8e8;color:#a01818;border-radius:var(--radius-sm);padding:9px 12px;font-size:12px;font-weight:700;margin-bottom:12px;display:none;}
+.login-err.show{display:block;}
+#loginScreen .btn-primary{width:100%;justify-content:center;padding:11px;font-size:14px;margin-top:4px;}
+
+/* ─── SYNC / USER BADGE ─── */
+.sync-badge{display:flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;color:var(--text-muted);padding:4px 9px;border-radius:20px;background:rgba(0,0,0,.04);}
+.dark .sync-badge{background:rgba(255,255,255,.06);}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:#999;flex-shrink:0;}
+.sync-badge.online .sync-dot{background:var(--success);}
+.sync-badge.offline .sync-dot{background:var(--danger);}
+.sync-badge.syncing .sync-dot{background:var(--warning);animation:pulse 1s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+.user-chip{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:var(--text);cursor:pointer;padding:5px 10px;border-radius:20px;background:rgba(0,0,0,.04);}
+.dark .user-chip{background:rgba(255,255,255,.06);}
+.user-chip svg{width:13px;height:13px;opacity:.65;}
+
+/* ─── EMPTY STATE ─── */
+.empty{text-align:center;padding:40px 20px;color:var(--text-muted);}
+.empty svg{width:52px;height:52px;opacity:.2;margin-bottom:10px;}
+.empty p{font-size:13px;}
+
+/* ─── ACTIONS CELL ─── */
+.ac{display:flex;gap:5px;flex-wrap:wrap;}
+
+/* ─── RESPONSIVE ─── */
+@media(max-width:768px){
+  .sidebar{transform:translateX(100%);width:240px;}
+  .sidebar.open{transform:translateX(0);}
+  .main{margin-right:0;}
+  .sb-toggle{display:flex;}
+  .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999;}
+  .sb-overlay.open{display:block;}
+  .content{padding:14px;}
+  .stats-grid{grid-template-columns:repeat(2,1fr);}
+  .topbar{padding:0 14px;}
+  .search-wrap{width:84px;}
+  .search-wrap input{width:84px;}
+  .sync-badge span:last-child{display:none;}
+  .user-chip span{display:none;}
+}
+
+/* ─── PRINT ─── */
+@media print{
+  .sidebar,.topbar,.no-print{display:none!important;}
+  .main{margin:0;}
+  .content{padding:0;}
+  .card,.chart-card{box-shadow:none;border:1px solid #ccc;}
+  body{background:#fff!important;}
+}
+
+/* ─── SCROLLBAR ─── */
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:10px;}
+</style>
+</head>
+<body>
+
+<!-- ── INLINE SVG DEFS (reusable) ── -->
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-truck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 4v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
+  </symbol>
+  <symbol id="i-driver" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+  </symbol>
+  <symbol id="i-warning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+  </symbol>
+  <symbol id="i-wrench" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+  </symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="20 6 9 17 4 12"/>
+  </symbol>
+  <symbol id="i-clipboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+  </symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+  </symbol>
+  <symbol id="i-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+  </symbol>
+  <symbol id="i-report" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+  </symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+  </symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+  </symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+  </symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+  </symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+  </symbol>
+  <symbol id="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+  </symbol>
+  <symbol id="i-image" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+  </symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+    <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+  </symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+  </symbol>
+  <symbol id="i-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+  </symbol>
+  <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+  </symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+  </symbol>
+  <symbol id="i-print" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
+  </symbol>
+  <symbol id="i-excel" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13l2 2 4-4"/>
+  </symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+    <line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>
+  </symbol>
+  <symbol id="i-history" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/>
+  </symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+  </symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+  </symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 6 12 13 2 6"/>
+  </symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+  </symbol>
+  <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+  </symbol>
+</svg>
+
+<div class="sb-overlay" id="sbOverlay" onclick="closeSidebar()"></div>
+
+<!-- ─── LOGIN SCREEN ─── -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-box"><svg><use href="#i-truck"/></svg></div>
+      <h1>نظام متابعة الآليات<br>والسائقين</h1>
+      <span>سجّل دخولك للمتابعة</span>
+    </div>
+    <div class="login-err" id="loginErr"></div>
+    <div class="form-group">
+      <label class="form-label">البريد الإلكتروني</label>
+      <input type="email" class="form-control" id="loginEmail" placeholder="admin@bilad.com" autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label class="form-label">كلمة المرور</label>
+      <input type="password" class="form-control" id="loginPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="btn btn-primary" id="loginBtn" onclick="doLogin()">
+      <svg><use href="#i-lock"/></svg> تسجيل الدخول
+    </button>
+  </div>
+</div>
+
+<!-- ─── SIDEBAR ─── -->
+<div class="sidebar" id="sidebar">
+  <div class="sb-head">
+    <div class="sb-logo">
+      <div class="sb-logo-box">
+        <svg><use href="#i-truck"/></svg>
+      </div>
+      <div class="sb-logo-text">
+        <h2>نظام متابعة الآليات</h2>
+        <span>والسائقين — v1.0</span>
+      </div>
+    </div>
+  </div>
+  <nav>
+    <div class="sb-section">الرئيسية</div>
+    <div class="nav-item active" onclick="showSection('dashboard')">
+      <svg class="n-ico"><use href="#i-chart"/></svg> لوحة الإحصائيات
+    </div>
+    <div class="sb-section">الإدارة</div>
+    <div class="nav-item" onclick="showSection('vehicles')">
+      <svg class="n-ico"><use href="#i-truck"/></svg> إدارة الآليات
+    </div>
+    <div class="nav-item" onclick="showSection('drivers')">
+      <svg class="n-ico"><use href="#i-driver"/></svg> إدارة السائقين
+    </div>
+    <div class="nav-item" onclick="showSection('assignments')">
+      <svg class="n-ico"><use href="#i-link"/></svg> تخصيص السائقين
+    </div>
+    <div class="sb-section">المتابعة</div>
+    <div class="nav-item" onclick="showSection('faults')">
+      <svg class="n-ico"><use href="#i-warning"/></svg> الأعطال والصيانة
+    </div>
+    <div class="nav-item" onclick="showSection('works')">
+      <svg class="n-ico"><use href="#i-clipboard"/></svg> الأعمال المنجزة
+    </div>
+    <div class="sb-section">التقارير والإعدادات</div>
+    <div class="nav-item" onclick="showSection('reports')">
+      <svg class="n-ico"><use href="#i-report"/></svg> التقارير
+    </div>
+    <div class="nav-item" onclick="showSection('settings')">
+      <svg class="n-ico"><use href="#i-settings"/></svg> الإعدادات والنسخ
+    </div>
+    <div class="nav-item" onclick="showSection('activity')">
+      <svg class="n-ico"><use href="#i-history"/></svg> سجل النشاط
+    </div>
+  </nav>
+</div>
+
+<!-- ─── MAIN ─── -->
+<div class="main">
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button class="sb-toggle btn-icon btn" onclick="toggleSidebar()">
+        <svg><use href="#i-menu"/></svg>
+      </button>
+      <span class="topbar-title" id="pageTitle">لوحة الإحصائيات</span>
+    </div>
+    <div class="topbar-right">
+      <div class="search-wrap no-print">
+        <svg><use href="#i-search"/></svg>
+        <input class="form-control" id="globalSearch" placeholder="بحث شامل..." oninput="globalSearchFn(this.value)" autocomplete="off">
+        <div class="gsr" id="gsrBox"></div>
+      </div>
+      <div class="sync-badge no-print" id="syncBadge" title="حالة الاتصال بقاعدة البيانات">
+        <span class="sync-dot"></span><span id="syncBadgeText">محلي</span>
+      </div>
+      <div class="user-chip no-print" id="userChip" onclick="doLogout()" title="تسجيل الخروج">
+        <svg><use href="#i-user"/></svg><span id="userChipEmail"></span><svg><use href="#i-logout"/></svg>
+      </div>
+      <div class="toggle" id="darkToggle" onclick="toggleDark()" title="الوضع الليلي"></div>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ════════════════ DASHBOARD ════════════════ -->
+    <div class="section active" id="section-dashboard">
+      <div id="alertsBox"></div>
+      <div class="stats-grid">
+        <div class="stat-card sc-blue" onclick="showStatDetail('vehicles')">
+          <div class="stat-icon-box"><svg><use href="#i-truck"/></svg></div>
+          <div class="stat-num" id="statVehicles">0</div>
+          <div class="stat-label">إجمالي الآليات</div>
+          <div class="stat-hint">انقر لعرض التفاصيل</div>
+        </div>
+        <div class="stat-card sc-green" onclick="showStatDetail('drivers')">
+          <div class="stat-icon-box"><svg><use href="#i-driver"/></svg></div>
+          <div class="stat-num" id="statDrivers">0</div>
+          <div class="stat-label">إجمالي السائقين</div>
+          <div class="stat-hint">انقر لعرض التفاصيل</div>
+        </div>
+        <div class="stat-card sc-red" onclick="showStatDetail('open')">
+          <div class="stat-icon-box"><svg><use href="#i-warning"/></svg></div>
+          <div class="stat-num" id="statOpenFaults">0</div>
+          <div class="stat-label">أعطال مفتوحة</div>
+          <div class="stat-hint">انقر لعرض التفاصيل</div>
+        </div>
+        <div class="stat-card sc-orange" onclick="showStatDetail('progress')">
+          <div class="stat-icon-box"><svg><use href="#i-wrench"/></svg></div>
+          <div class="stat-num" id="statProgressFaults">0</div>
+          <div class="stat-label">قيد الإصلاح</div>
+          <div class="stat-hint">انقر لعرض التفاصيل</div>
+        </div>
+        <div class="stat-card sc-purple" onclick="showStatDetail('done')">
+          <div class="stat-icon-box"><svg><use href="#i-check"/></svg></div>
+          <div class="stat-num" id="statDoneFaults">0</div>
+          <div class="stat-label">أعطال مكتملة</div>
+          <div class="stat-hint">انقر لعرض التفاصيل</div>
+        </div>
+        <div class="stat-card sc-teal" onclick="showStatDetail('works')">
+          <div class="stat-icon-box"><svg><use href="#i-clipboard"/></svg></div>
+          <div class="stat-num" id="statWorks">0</div>
+          <div class="stat-label">أعمال منجزة</div>
+          <div class="stat-hint">انقر لعرض التفاصيل</div>
+        </div>
+      </div>
+
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-title"><svg><use href="#i-chart"/></svg> توزيع حالات الأعطال</div>
+          <canvas id="chartFaults" height="220"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title"><svg><use href="#i-chart"/></svg> الأعمال المنجزة حسب الشهر</div>
+          <canvas id="chartWorks" height="220"></canvas>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <div class="card-header">
+          <div class="card-title"><svg><use href="#i-warning"/></svg> آخر الأعطال المسجلة</div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>رقم العطل</th><th>الآلية</th><th>السائق</th><th>نوع العطل</th><th>التاريخ</th><th>الحالة</th></tr></thead>
+            <tbody id="recentFaultsTbl"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════ VEHICLES ════════════════ -->
+    <div class="section" id="section-vehicles">
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-header">
+          <div class="card-title"><svg><use href="#i-truck"/></svg> إدارة الآليات</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <div class="search-wrap">
+              <svg><use href="#i-search"/></svg>
+              <input class="form-control" id="vehicleSearch" placeholder="بحث..." oninput="renderVehicles()">
+            </div>
+            <button class="btn btn-primary" onclick="openVehicleModal()">
+              <svg><use href="#i-plus"/></svg> إضافة آلية
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="vehicles-grid" id="vehiclesGrid"></div>
+    </div>
+
+    <!-- ════════════════ DRIVERS ════════════════ -->
+    <div class="section" id="section-drivers">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><svg><use href="#i-driver"/></svg> إدارة السائقين</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <div class="search-wrap">
+              <svg><use href="#i-search"/></svg>
+              <input class="form-control" id="driverSearch" placeholder="بحث..." oninput="renderDrivers()">
+            </div>
+            <button class="btn btn-primary" onclick="openDriverModal()">
+              <svg><use href="#i-plus"/></svg> إضافة سائق
+            </button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>الاسم الكامل</th><th>الآلية المخصصة</th><th>ملاحظات</th><th>الإجراءات</th></tr></thead>
+            <tbody id="driversTbl"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════ ASSIGNMENTS ════════════════ -->
+    <div class="section" id="section-assignments">
+      <div class="card" style="margin-bottom:14px;">
+        <div class="card-title" style="margin-bottom:16px;"><svg><use href="#i-link"/></svg> تخصيص السائقين للآليات</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>الآلية</th><th>رقم الآلية</th><th>السائق الحالي</th><th>تغيير السائق</th></tr></thead>
+            <tbody id="assignTbl"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:14px;"><svg><use href="#i-history"/></svg> سجل التغييرات</div>
+        <div id="assignHistory"></div>
+      </div>
+    </div>
+
+    <!-- ════════════════ FAULTS ════════════════ -->
+    <div class="section" id="section-faults">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><svg><use href="#i-warning"/></svg> الأعطال والصيانة</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <div class="search-wrap">
+              <svg><use href="#i-search"/></svg>
+              <input class="form-control" id="faultSearch" placeholder="بحث..." oninput="renderFaults()">
+            </div>
+            <button class="btn btn-primary" onclick="openFaultModal()">
+              <svg><use href="#i-plus"/></svg> تسجيل عطل
+            </button>
+          </div>
+        </div>
+        <div class="tabs" id="faultStatusTabs">
+          <div class="tab active" data-status="" onclick="setFaultFilter('',this)">الكل <span id="cntAll">0</span></div>
+          <div class="tab" data-status="مفتوح" onclick="setFaultFilter('مفتوح',this)">مفتوح <span id="cntOpen">0</span></div>
+          <div class="tab" data-status="قيد الإصلاح" onclick="setFaultFilter('قيد الإصلاح',this)">قيد الإصلاح <span id="cntProg">0</span></div>
+          <div class="tab" data-status="مكتمل" onclick="setFaultFilter('مكتمل',this)">مكتمل <span id="cntDone">0</span></div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>رقم العطل</th><th>الآلية</th><th>السائق</th><th>نوع العطل</th><th>الوصف</th><th>التاريخ</th><th>الحالة</th><th>الإجراءات</th></tr></thead>
+            <tbody id="faultsTbl"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════ WORKS ════════════════ -->
+    <div class="section" id="section-works">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><svg><use href="#i-clipboard"/></svg> الأعمال المنجزة</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <div class="search-wrap">
+              <svg><use href="#i-search"/></svg>
+              <input class="form-control" id="workSearch" placeholder="بحث..." oninput="renderWorks()">
+            </div>
+            <button class="btn btn-primary" onclick="openWorkModal()">
+              <svg><use href="#i-plus"/></svg> إضافة إنجاز
+            </button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>رقم الإنجاز</th><th>الآلية</th><th>نوع العمل</th><th>الوصف</th><th>تاريخ الإنجاز</th><th>المنفذ</th><th>ملاحظات</th><th>الإجراءات</th></tr></thead>
+            <tbody id="worksTbl"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════ REPORTS ════════════════ -->
+    <div class="section" id="section-reports">
+      <div class="card">
+        <div class="card-title" style="margin-bottom:14px;"><svg><use href="#i-report"/></svg> التقارير</div>
+        <div class="tabs">
+          <div class="tab active" onclick="switchReportTab(this,'r-vehicles')">الآليات</div>
+          <div class="tab" onclick="switchReportTab(this,'r-drivers')">السائقون</div>
+          <div class="tab" onclick="switchReportTab(this,'r-open')">أعطال مفتوحة</div>
+          <div class="tab" onclick="switchReportTab(this,'r-done')">أعطال مكتملة</div>
+          <div class="tab" onclick="switchReportTab(this,'r-works')">الأعمال المنجزة</div>
+          <div class="tab" onclick="switchReportTab(this,'r-filter')">تقرير مخصص</div>
+        </div>
+
+        <div class="report-filters" id="reportFilters" style="display:none;">
+          <div class="form-group">
+            <label class="form-label">من تاريخ</label>
+            <input type="date" class="form-control" id="rDateFrom">
+          </div>
+          <div class="form-group">
+            <label class="form-label">إلى تاريخ</label>
+            <input type="date" class="form-control" id="rDateTo">
+          </div>
+          <div class="form-group">
+            <label class="form-label">الآلية</label>
+            <select class="form-control" id="rVehicle" style="width:150px;"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">القسم</label>
+            <select class="form-control" id="rSection" style="width:130px;">
+              <option value="faults">الأعطال</option>
+              <option value="works">الأعمال المنجزة</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="renderCustomReport()">
+            <svg><use href="#i-filter"/></svg> عرض
+          </button>
+        </div>
+
+        <div style="display:flex;gap:7px;margin-bottom:14px;" class="no-print">
+          <button class="btn btn-outline btn-sm" onclick="printReport()">
+            <svg><use href="#i-print"/></svg> طباعة
+          </button>
+          <button class="btn btn-success btn-sm" onclick="exportPDF()">
+            <svg><use href="#i-report"/></svg> تصدير PDF
+          </button>
+          <button class="btn btn-info btn-sm" onclick="exportExcel()">
+            <svg><use href="#i-excel"/></svg> تصدير Excel
+          </button>
+        </div>
+
+        <div id="reportContent"></div>
+      </div>
+    </div>
+
+    <!-- ════════════════ SETTINGS ════════════════ -->
+    <div class="section" id="section-settings">
+      <div class="card" style="margin-bottom:14px;">
+        <div class="card-title" style="margin-bottom:16px;"><svg><use href="#i-sun"/></svg> المظهر</div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="font-size:13px;font-weight:700;">الوضع الليلي</span>
+          <div class="toggle" id="darkToggle2" onclick="toggleDark()"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:16px;"><svg><use href="#i-save"/></svg> النسخ الاحتياطي</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="backupData()">
+            <svg><use href="#i-download"/></svg> نسخ احتياطي
+          </button>
+          <label class="btn btn-warning" style="cursor:pointer;">
+            <svg><use href="#i-upload"/></svg> استعادة البيانات
+            <input type="file" accept=".json" style="display:none;" onchange="restoreData(this)">
+          </label>
+          <button class="btn btn-danger" onclick="clearAll()">
+            <svg><use href="#i-trash"/></svg> حذف جميع البيانات
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════ ACTIVITY LOG ════════════════ -->
+    <div class="section" id="section-activity">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><svg><use href="#i-history"/></svg> سجل نشاط النظام</div>
+        </div>
+        <div id="activityNote" style="display:none;font-size:12px;font-weight:700;color:var(--text-muted);background:rgba(0,0,0,.03);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:12px;">
+          سجل النشاط يعمل فقط عند الاتصال بقاعدة بيانات Firebase (لا يُحفظ محلياً).
+        </div>
+        <div class="history-list" id="activityList"></div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<!-- ─── TOAST ─── -->
+<div class="toast-box" id="toastBox"></div>
+
+<!-- ─── LIGHTBOX ─── -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <div class="lb-close"><svg><use href="#i-close"/></svg></div>
+  <img id="lbImg" src="">
+</div>
+
+<!-- ════ MODALS ════ -->
+
+<!-- Vehicle Modal -->
+<div class="modal-overlay" id="vehicleModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title"><svg><use href="#i-truck"/></svg> <span id="vmTitle">إضافة آلية جديدة</span></div>
+      <button class="btn btn-icon" onclick="closeModal('vehicleModal')"><svg><use href="#i-close"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="vehicleId">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">رقم الآلية *</label>
+          <input type="text" class="form-control" id="vehicleNum" placeholder="مثال: 001">
+        </div>
+        <div class="form-group">
+          <label class="form-label">اسم الآلية *</label>
+          <input type="text" class="form-control" id="vehicleName" placeholder="مثال: شاحنة MAN">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">صورة الآلية</label>
+        <div class="img-upload-area" onclick="document.getElementById('vImgInput').click()">
+          <label style="cursor:pointer;display:block;">
+            <input type="file" id="vImgInput" accept="image/*" style="display:none;" onchange="previewVImg(this)">
+            <div id="vImgWrap">
+              <svg><use href="#i-image"/></svg>
+              <p>انقر لرفع صورة الآلية</p>
+            </div>
+          </label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">ملاحظات</label>
+        <textarea class="form-control" id="vehicleNotes" placeholder="أي ملاحظات..."></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">آخر صيانة</label>
+          <input type="date" class="form-control" id="vehicleLastMaint">
+        </div>
+        <div class="form-group">
+          <label class="form-label">موعد الصيانة القادمة</label>
+          <input type="date" class="form-control" id="vehicleNextMaint">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('vehicleModal')">إلغاء</button>
+      <button class="btn btn-primary" onclick="saveVehicle()"><svg><use href="#i-save"/></svg> حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Driver Modal -->
+<div class="modal-overlay" id="driverModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title"><svg><use href="#i-driver"/></svg> <span id="dmTitle">إضافة سائق</span></div>
+      <button class="btn btn-icon" onclick="closeModal('driverModal')"><svg><use href="#i-close"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="driverId">
+      <div class="form-group">
+        <label class="form-label">الاسم الكامل *</label>
+        <input type="text" class="form-control" id="driverName" placeholder="الاسم الكامل للسائق">
+      </div>
+      <div class="form-group">
+        <label class="form-label">ملاحظات</label>
+        <textarea class="form-control" id="driverNotes" placeholder="أي ملاحظات..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('driverModal')">إلغاء</button>
+      <button class="btn btn-primary" onclick="saveDriver()"><svg><use href="#i-save"/></svg> حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Fault Modal -->
+<div class="modal-overlay" id="faultModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title"><svg><use href="#i-warning"/></svg> <span id="fmTitle">تسجيل عطل جديد</span></div>
+      <button class="btn btn-icon" onclick="closeModal('faultModal')"><svg><use href="#i-close"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="faultId">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">الآلية *</label>
+          <select class="form-control" id="faultVehicle" onchange="autoFillFaultDriver()"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">السائق</label>
+          <input type="text" class="form-control" id="faultDriver" readonly placeholder="يُملأ تلقائياً">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">نوع العطل *</label>
+          <input type="text" class="form-control" id="faultType" placeholder="مثال: عطل كهربائي">
+        </div>
+        <div class="form-group">
+          <label class="form-label">حالة العطل</label>
+          <select class="form-control" id="faultStatus">
+            <option>مفتوح</option><option>قيد الإصلاح</option><option>مكتمل</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">وصف العطل</label>
+        <textarea class="form-control" id="faultDesc" placeholder="وصف تفصيلي للعطل..."></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">تاريخ تسجيل العطل</label>
+        <input type="date" class="form-control" id="faultDate">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">صورة قبل الإصلاح</label>
+          <div class="img-upload-area" onclick="document.getElementById('fBeforeInput').click()">
+            <label style="cursor:pointer;display:block;">
+              <input type="file" id="fBeforeInput" accept="image/*" capture="environment" style="display:none;" onchange="previewFaultImg(this,'before')">
+              <div id="fBeforeWrap"><svg><use href="#i-image"/></svg><p>قبل الإصلاح</p></div>
+            </label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">صورة بعد الإصلاح</label>
+          <div class="img-upload-area" onclick="document.getElementById('fAfterInput').click()">
+            <label style="cursor:pointer;display:block;">
+              <input type="file" id="fAfterInput" accept="image/*" capture="environment" style="display:none;" onchange="previewFaultImg(this,'after')">
+              <div id="fAfterWrap"><svg><use href="#i-image"/></svg><p>بعد الإصلاح</p></div>
+            </label>
+          </div>
+        </div>
+      </div>
+      <div id="faultPhotoNote" style="display:none;font-size:11px;font-weight:700;color:var(--text-muted);">
+        💡 الصور تُحفظ على Firebase فقط — سجّل دخولك أولاً ليتم حفظها.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('faultModal')">إلغاء</button>
+      <button class="btn btn-primary" id="faultSaveBtn" onclick="saveFault()"><svg><use href="#i-save"/></svg> حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Work Modal -->
+<div class="modal-overlay" id="workModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title"><svg><use href="#i-clipboard"/></svg> <span id="wkTitle">إضافة عمل منجز</span></div>
+      <button class="btn btn-icon" onclick="closeModal('workModal')"><svg><use href="#i-close"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="workId">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">الآلية *</label>
+          <select class="form-control" id="workVehicle"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">نوع العمل المنجز *</label>
+          <input type="text" class="form-control" id="workType" placeholder="مثال: تغيير زيت">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">وصف العمل</label>
+        <textarea class="form-control" id="workDesc" placeholder="وصف تفصيلي..."></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">تاريخ الإنجاز</label>
+          <input type="date" class="form-control" id="workDate">
+        </div>
+        <div class="form-group">
+          <label class="form-label">اسم المنفذ</label>
+          <input type="text" class="form-control" id="workExecutor" placeholder="اسم المنفذ">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">ملاحظات</label>
+        <textarea class="form-control" id="workNotes" placeholder="ملاحظات إضافية..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('workModal')">إلغاء</button>
+      <button class="btn btn-primary" onclick="saveWork()"><svg><use href="#i-save"/></svg> حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Modal -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal" style="max-width:360px;">
+    <div class="modal-header">
+      <div class="modal-title"><svg><use href="#i-trash"/></svg> تأكيد الحذف</div>
+      <button class="btn btn-icon" onclick="closeModal('confirmModal')"><svg><use href="#i-close"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <p id="confirmMsg" style="font-size:13.5px;line-height:1.7;font-weight:600;"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('confirmModal')">إلغاء</button>
+      <button class="btn btn-danger" id="confirmBtn"><svg><use href="#i-trash"/></svg> تأكيد الحذف</button>
+    </div>
+  </div>
+</div>
+
+<!-- Stat Detail Modal -->
+<div class="modal-overlay" id="statModal">
+  <div class="modal" style="max-width:680px;">
+    <div class="modal-header">
+      <div class="modal-title" id="statModalTitle"></div>
+      <button class="btn btn-icon" onclick="closeModal('statModal')"><svg><use href="#i-close"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="table-wrap">
+        <table>
+          <thead id="statThead"></thead>
+          <tbody id="statTbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('statModal')">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════ SCRIPT ════════════════════════════════════ -->
+<script>
+// ── DATA ──
+const DB = {
+  get: k => JSON.parse(localStorage.getItem(k)||'[]'),
+  set: (k,v) => localStorage.setItem(k,JSON.stringify(v)),
+  vehicles:    () => DB.get('sys_v'),
+  drivers:     () => DB.get('sys_d'),
+  faults:      () => DB.get('sys_f'),
+  works:       () => DB.get('sys_w'),
+  assignments: () => DB.get('sys_a'),
+  history:     () => DB.get('sys_h'),
+};
+const saveV = d => DB.set('sys_v',d);
+const saveD = d => DB.set('sys_d',d);
+const saveF = d => DB.set('sys_f',d);
+const saveW = d => DB.set('sys_w',d);
+const saveA = d => DB.set('sys_a',d);
+const saveH = d => DB.set('sys_h',d);
+
+const uid   = () => Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const today = () => new Date().toISOString().slice(0,10);
+const nowStr= () => new Date().toLocaleString('ar-IQ');
+
+// ════════════════════════════════════════════════════════════
+// ── FIREBASE SETUP ──
+// ════════════════════════════════════════════════════════════
+const firebaseConfig = {
+  apiKey: "AIzaSyDVadXwfpD0RMEHBXP_18Cu8szTXZtc84o",
+  authDomain: "bilad-fleet-system.firebaseapp.com",
+  databaseURL: "https://bilad-fleet-system-default-rtdb.firebaseio.com",
+  projectId: "bilad-fleet-system",
+  storageBucket: "bilad-fleet-system.firebasestorage.app",
+  messagingSenderId: "641314848453",
+  appId: "1:641314848453:web:a608491bc54272e4e9baac"
+};
+
+let fbDB = null, fbReady = false, currentUser = null;
+
+const COLLECTIONS = {
+  vehicles:    {key:'sys_v', kind:'doc'},
+  drivers:     {key:'sys_d', kind:'doc'},
+  faults:      {key:'sys_f', kind:'doc'},
+  works:       {key:'sys_w', kind:'doc'},
+  assignments: {key:'sys_a', kind:'doc', idField:'vehicleId'},
+};
+
+function setSyncBadge(state){
+  const b=document.getElementById('syncBadge'), t=document.getElementById('syncBadgeText');
+  if(!b) return;
+  b.classList.remove('online','offline','syncing');
+  if(state==='online'){  b.classList.add('online');  t.textContent='متصل'; }
+  if(state==='offline'){ b.classList.add('offline'); t.textContent='غير متصل'; }
+  if(state==='syncing'){ b.classList.add('syncing'); t.textContent='مزامنة...'; }
+  if(state==='local'){   t.textContent='محلي'; }
+}
+
+function initFirebase(){
+  try{
+    firebase.initializeApp(firebaseConfig);
+    fbDB = firebase.firestore();
+    fbDB.enablePersistence({synchronizeTabs:true}).catch(()=>{});
+    firebase.auth().onAuthStateChanged(user=>{
+      if(user){
+        currentUser = user;
+        document.getElementById('loginScreen').style.display='none';
+        document.getElementById('userChipEmail').textContent = user.email;
+        fbReady = true;
+        setSyncBadge('online');
+        attachListeners();
+        migrateLocalToFirebase();
+      } else {
+        currentUser = null; fbReady = false;
+        document.getElementById('loginScreen').style.display='flex';
+      }
+    });
+  }catch(err){
+    console.error('Firebase init error', err);
+    document.getElementById('loginErr').textContent = 'تعذّر الاتصال بـ Firebase — تحقق من اتصال الإنترنت.';
+    document.getElementById('loginErr').classList.add('show');
+  }
+}
+
+function doLogin(){
+  const email=document.getElementById('loginEmail').value.trim();
+  const pass=document.getElementById('loginPass').value;
+  const errBox=document.getElementById('loginErr');
+  errBox.classList.remove('show');
+  if(!email||!pass){ errBox.textContent='يرجى إدخال البريد الإلكتروني وكلمة المرور'; errBox.classList.add('show'); return; }
+  const btn=document.getElementById('loginBtn');
+  btn.disabled=true; btn.style.opacity='.6';
+  firebase.auth().signInWithEmailAndPassword(email, pass)
+    .catch(err=>{
+      const msgs={
+        'auth/invalid-email':'البريد الإلكتروني غير صالح',
+        'auth/user-not-found':'لا يوجد حساب بهذا البريد',
+        'auth/wrong-password':'كلمة المرور غير صحيحة',
+        'auth/invalid-credential':'بيانات الدخول غير صحيحة',
+        'auth/too-many-requests':'محاولات كثيرة، حاول لاحقاً',
+        'auth/network-request-failed':'تحقق من اتصال الإنترنت',
+      };
+      errBox.textContent = msgs[err.code] || 'تعذّر تسجيل الدخول، حاول مجدداً';
+      errBox.classList.add('show');
+    })
+    .finally(()=>{ btn.disabled=false; btn.style.opacity='1'; });
+}
+function doLogout(){
+  confirm('هل تريد تسجيل الخروج؟', ()=>{ firebase.auth().signOut(); });
+}
+
+// ── REAL-TIME SYNC ──
+function attachListeners(){
+  Object.entries(COLLECTIONS).forEach(([col,cfg])=>{
+    fbDB.collection(col).onSnapshot(snap=>{
+      const arr = snap.docs.map(d=>d.data());
+      localStorage.setItem(cfg.key, JSON.stringify(arr));
+      refreshCurrentView();
+    }, err=>console.error(col,'sync error',err));
+  });
+  fbDB.collection('assign_history').orderBy('ts','desc').limit(50).onSnapshot(snap=>{
+    const arr = snap.docs.map(d=>d.data()).reverse();
+    localStorage.setItem('sys_h', JSON.stringify(arr));
+    refreshCurrentView();
+  }, err=>console.error('history sync error',err));
+  document.getElementById('activityNote').style.display='none';
+  fbDB.collection('activity_log').orderBy('ts','desc').limit(80).onSnapshot(snap=>{
+    activityCache = snap.docs.map(d=>d.data());
+    if(document.getElementById('section-activity')?.classList.contains('active')) renderActivityLog();
+  }, err=>console.error('activity sync error',err));
+}
+
+function refreshCurrentView(){
+  const active = document.querySelector('.section.active')?.id?.replace('section-','');
+  if(!active) return;
+  if(active==='dashboard')   renderDashboard();
+  if(active==='vehicles')    renderVehicles();
+  if(active==='drivers')     renderDrivers();
+  if(active==='assignments') renderAssignments();
+  if(active==='faults')    { renderFaults(); }
+  if(active==='works')     { renderWorks(); }
+  if(active==='activity')  { renderActivityLog(); }
+}
+
+async function fsSet(col, id, data){
+  if(!fbReady) return;
+  try{ await fbDB.collection(col).doc(id).set(data); }
+  catch(err){ console.error('fsSet',col,err); toast('تعذّرت مزامنة البيانات مع السيرفر','warning'); }
+}
+async function fsDelete(col, id){
+  if(!fbReady) return;
+  try{ await fbDB.collection(col).doc(id).delete(); }
+  catch(err){ console.error('fsDelete',col,err); toast('تعذّر حذف السجل من السيرفر','warning'); }
+}
+
+// ── ONE-TIME LOCAL → FIREBASE MIGRATION ──
+async function migrateLocalToFirebase(){
+  if(localStorage.getItem('fbMigrated_v1')==='true') return;
+  let migratedAny=false;
+  try{
+    for(const [col,cfg] of Object.entries(COLLECTIONS)){
+      const localArr = JSON.parse(localStorage.getItem(cfg.key)||'[]');
+      if(!localArr.length) continue;
+      const snap = await fbDB.collection(col).limit(1).get();
+      if(!snap.empty) continue;
+      const batch = fbDB.batch();
+      localArr.forEach(item=>{
+        const docId = cfg.idField ? item[cfg.idField] : (item.id || uid());
+        if(!item.id) item.id = docId;
+        batch.set(fbDB.collection(col).doc(docId), item);
+      });
+      await batch.commit();
+      migratedAny=true;
+    }
+    const localHist = JSON.parse(localStorage.getItem('sys_h')||'[]');
+    if(localHist.length){
+      const snap = await fbDB.collection('assign_history').limit(1).get();
+      if(snap.empty){
+        const batch = fbDB.batch();
+        localHist.forEach(h=>{ batch.set(fbDB.collection('assign_history').doc(uid()), {...h, ts:firebase.firestore.FieldValue.serverTimestamp()}); });
+        await batch.commit();
+        migratedAny=true;
+      }
+    }
+    localStorage.setItem('fbMigrated_v1','true');
+    if(migratedAny) toast('تمت مزامنة البيانات المحلية مع Firebase بنجاح');
+  }catch(err){
+    console.error('migration error', err);
+  }
+}
+
+// ── ACTIVITY LOG ──
+let activityCache = [];
+function logActivity(action, label){
+  if(!fbReady) return;
+  fbDB.collection('activity_log').add({
+    action, label,
+    user: currentUser?.email || 'غير معروف',
+    ts: firebase.firestore.FieldValue.serverTimestamp()
+  }).catch(err=>console.error('activity log error',err));
+}
+function renderActivityLog(){
+  const el=document.getElementById('activityList');
+  const note=document.getElementById('activityNote');
+  if(!fbReady){ note.style.display='block'; el.innerHTML=''; return; }
+  note.style.display='none';
+  if(!activityCache.length){ el.innerHTML=`<div class="empty"><svg><use href="#i-history"/></svg><p>لا يوجد نشاط مسجل بعد</p></div>`; return; }
+  el.innerHTML=activityCache.map(a=>{
+    const t = a.ts?.toDate ? a.ts.toDate().toLocaleString('ar-IQ') : '...';
+    return `<div class="history-item">
+      <div class="history-text"><strong>${a.user||''}</strong> — ${a.action} ${a.label||''}</div>
+      <div class="history-date">${t}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── WORK ORDER NUMBERING (WO-YYYY-NNN) ──
+async function nextWONum(){
+  if(fbReady){
+    try{
+      const yr = new Date().getFullYear();
+      const ref = fbDB.collection('meta').doc('woCounter');
+      const seq = await fbDB.runTransaction(async tx=>{
+        const snap = await tx.get(ref);
+        let data = snap.exists ? snap.data() : {};
+        if(data.year !== yr) data = {year:yr, seq:0};
+        data.seq = (data.seq||0)+1;
+        tx.set(ref, data);
+        return data.seq;
+      });
+      return `WO-${yr}-${String(seq).padStart(3,'0')}`;
+    }catch(err){ console.error('WO transaction failed, using local fallback', err); }
+  }
+  const yr = new Date().getFullYear();
+  let wo = JSON.parse(localStorage.getItem('woSeq')||'{}');
+  if(wo.year !== yr){ wo = {year:yr, seq:0}; }
+  wo.seq++;
+  localStorage.setItem('woSeq', JSON.stringify(wo));
+  return `WO-${yr}-${String(wo.seq).padStart(3,'0')}`;
+}
+
+// ── DATE / OVERDUE HELPERS ──
+function daysSince(d){
+  if(!d) return 0;
+  return Math.floor((new Date(today()) - new Date(d)) / 86400000);
+}
+function daysUntil(d){
+  if(!d) return null;
+  return Math.floor((new Date(d) - new Date(today())) / 86400000);
+}
+
+let vc = +localStorage.getItem('vc')||0;
+let dc = +localStorage.getItem('dc')||0;
+let fc = +localStorage.getItem('fc')||0;
+let wc = +localStorage.getItem('wc')||0;
+
+// ── NAVIGATION ──
+const titles = {
+  dashboard:'لوحة الإحصائيات', vehicles:'إدارة الآليات', drivers:'إدارة السائقين',
+  assignments:'تخصيص السائقين', faults:'الأعطال والصيانة', works:'الأعمال المنجزة',
+  reports:'التقارير', settings:'الإعدادات والنسخ الاحتياطي', activity:'سجل النشاط'
+};
+
+function showSection(name){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));
+  document.getElementById('section-'+name).classList.add('active');
+  document.querySelector(`[onclick="showSection('${name}')"]`).classList.add('active');
+  document.getElementById('pageTitle').textContent = titles[name];
+  closeSidebar();
+  if(name==='dashboard')   renderDashboard();
+  if(name==='vehicles')    renderVehicles();
+  if(name==='drivers')     renderDrivers();
+  if(name==='assignments') renderAssignments();
+  if(name==='faults')    { populateFaultVehicles(); renderFaults(); }
+  if(name==='works')     { populateWorkVehicles();  renderWorks();  }
+  if(name==='reports')   { populateReportVehicles(); showReportTab('r-vehicles'); }
+  if(name==='activity')  { renderActivityLog(); }
+}
+
+function toggleSidebar(){ document.getElementById('sidebar').classList.toggle('open'); document.getElementById('sbOverlay').classList.toggle('open'); }
+function closeSidebar()  { document.getElementById('sidebar').classList.remove('open'); document.getElementById('sbOverlay').classList.remove('open'); }
+
+// ── DARK MODE ──
+function toggleDark(){
+  document.body.classList.toggle('dark');
+  const on = document.body.classList.contains('dark');
+  document.getElementById('darkToggle').classList.toggle('on',on);
+  document.getElementById('darkToggle2').classList.toggle('on',on);
+  localStorage.setItem('darkMode',on);
+}
+
+// ── TOAST ──
+function toast(msg, type='success'){
+  const icons = { success:'i-check', danger:'i-trash', warning:'i-warning', info:'i-search' };
+  const el = document.createElement('div');
+  el.className = `toast t-${type}`;
+  el.innerHTML = `<svg><use href="#${icons[type]||'i-check'}"/></svg>${msg}`;
+  document.getElementById('toastBox').appendChild(el);
+  setTimeout(()=>el.remove(), 3000);
+}
+
+// ── CONFIRM ──
+function confirm(msg, cb){
+  document.getElementById('confirmMsg').textContent = msg;
+  openModal('confirmModal');
+  document.getElementById('confirmBtn').onclick = ()=>{ closeModal('confirmModal'); cb(); };
+}
+
+// ── MODAL ──
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+
+// ── LIGHTBOX ──
+function openLightbox(src){ document.getElementById('lbImg').src=src; document.getElementById('lightbox').classList.add('open'); }
+function closeLightbox(){ document.getElementById('lightbox').classList.remove('open'); }
+
+// ── IMAGE UPLOAD ──
+function previewVImg(input){
+  if(!input.files[0]) return;
+  const r = new FileReader();
+  r.onload = e => {
+    document.getElementById('vImgWrap').innerHTML = `<img src="${e.target.result}" style="max-height:120px;border-radius:7px;">`;
+    input.dataset.b64 = e.target.result;
+  };
+  r.readAsDataURL(input.files[0]);
+}
+
+// ── EMPTY ROW ──
+function emptyRow(cols, msg='لا توجد بيانات'){
+  return `<tr><td colspan="${cols}"><div class="empty"><svg><use href="#i-clipboard"/></svg><p>${msg}</p></div></td></tr>`;
+}
+
+// ── STATUS BADGE ──
+function statusBadge(s){
+  const cls = {'مفتوح':'badge-open','قيد الإصلاح':'badge-progress','مكتمل':'badge-done'};
+  return `<span class="badge ${cls[s]||''}">${s}</span>`;
+}
+function overdueTag(f){
+  if(f.status==='مكتمل') return '';
+  const d = daysSince(f.date);
+  if(d>=14) return ` <span class="badge badge-overdue" title="مفتوح منذ ${d} يوم">متأخر جداً</span>`;
+  if(d>=7)  return ` <span class="badge badge-duesoon" title="مفتوح منذ ${d} يوم">متأخر</span>`;
+  return '';
+}
+
+// ════════ DASHBOARD ════════
+let faultChart, workChart;
+
+function renderDashboard(){
+  renderAlerts();
+  const V=DB.vehicles(), D=DB.drivers(), F=DB.faults(), W=DB.works();
+  const open=F.filter(f=>f.status==='مفتوح').length;
+  const prog=F.filter(f=>f.status==='قيد الإصلاح').length;
+  const done=F.filter(f=>f.status==='مكتمل').length;
+
+  document.getElementById('statVehicles').textContent    = V.length;
+  document.getElementById('statDrivers').textContent     = D.length;
+  document.getElementById('statOpenFaults').textContent  = open;
+  document.getElementById('statProgressFaults').textContent = prog;
+  document.getElementById('statDoneFaults').textContent  = done;
+  document.getElementById('statWorks').textContent       = W.length;
+
+  const textColor = document.body.classList.contains('dark') ? '#d8e8f4' : '#1a2a3a';
+
+  if(faultChart) faultChart.destroy();
+  faultChart = new Chart(document.getElementById('chartFaults'),{
+    type:'doughnut',
+    data:{ labels:['مفتوح','قيد الإصلاح','مكتمل'], datasets:[{ data:[open,prog,done], backgroundColor:['#b52020','#c47a00','#1a8a4a'], borderWidth:0 }] },
+    options:{ plugins:{ legend:{ labels:{ font:{family:'Cairo',weight:'700'}, color:textColor } } }, cutout:'60%' }
+  });
+
+  const months={};
+  W.forEach(w=>{ if(!w.date)return; const m=w.date.slice(0,7); months[m]=(months[m]||0)+1; });
+  const sm=Object.keys(months).sort().slice(-6);
+  if(workChart) workChart.destroy();
+  workChart = new Chart(document.getElementById('chartWorks'),{
+    type:'bar',
+    data:{ labels:sm, datasets:[{ label:'أعمال منجزة', data:sm.map(m=>months[m]), backgroundColor:'#1e4a75', borderRadius:5 }] },
+    options:{ plugins:{ legend:{ labels:{ font:{family:'Cairo',weight:'700'}, color:textColor } } }, scales:{
+      y:{ ticks:{ font:{family:'Cairo'}, color:textColor } },
+      x:{ ticks:{ font:{family:'Cairo'}, color:textColor } }
+    }}
+  });
+
+  const tbody=document.getElementById('recentFaultsTbl');
+  const recent=[...F].reverse().slice(0,8);
+  if(!recent.length){ tbody.innerHTML=emptyRow(6,'لا توجد أعطال مسجلة'); return; }
+  tbody.innerHTML=recent.map(f=>`
+    <tr>
+      <td>${f.num}</td><td>${f.vehicleName}</td><td>${f.driver||'-'}</td>
+      <td>${f.type}</td><td>${f.date}</td><td>${statusBadge(f.status)}</td>
+    </tr>`).join('');
+}
+
+// ════════ ALERTS (overdue faults + due maintenance) ════════
+function renderAlerts(){
+  const F=DB.faults(), V=DB.vehicles();
+  const overdue = F.filter(f=>f.status!=='مكتمل' && daysSince(f.date)>=7);
+  const veryOverdue = overdue.filter(f=>daysSince(f.date)>=14).length;
+  const dueMaint = V.filter(v=>{
+    if(!v.nextMaint) return false;
+    const du = daysUntil(v.nextMaint);
+    return du!==null && du<=7;
+  });
+  let html='';
+  if(overdue.length){
+    html += `<div class="alert-banner" onclick="showSection('faults')">
+      <svg><use href="#i-warning"/></svg>
+      يوجد ${overdue.length} عطل متأخر أكثر من 7 أيام${veryOverdue?` (منها ${veryOverdue} متأخر أكثر من 14 يوم)`:''} — اضغط للمراجعة
+    </div>`;
+  }
+  if(dueMaint.length){
+    const overdueMaint = dueMaint.filter(v=>daysUntil(v.nextMaint)<0).length;
+    const soonMaint = dueMaint.length - overdueMaint;
+    const parts=[];
+    if(overdueMaint) parts.push(`${overdueMaint} آلية تجاوزت موعد صيانتها`);
+    if(soonMaint) parts.push(`${soonMaint} آلية صيانتها مستحقة خلال 7 أيام`);
+    html += `<div class="alert-banner alert-amber" onclick="showSection('vehicles')">
+      <svg><use href="#i-wrench"/></svg>
+      يوجد ${parts.join('، و')} — اضغط للمراجعة
+    </div>`;
+  }
+  document.getElementById('alertsBox').innerHTML = html;
+}
+
+// ════════ STAT DETAIL ════════
+function showStatDetail(type){
+  const V=DB.vehicles(), D=DB.drivers(), F=DB.faults(), W=DB.works(), A=DB.assignments();
+  let title='', thead='', rows='';
+
+  if(type==='vehicles'){
+    title='قائمة الآليات';
+    thead=`<tr><th>#</th><th>الرقم</th><th>الاسم</th><th>السائق المخصص</th><th>ملاحظات</th></tr>`;
+    rows=V.map((v,i)=>{
+      const a=A.find(x=>x.vehicleId===v.id);
+      const dn=a?(D.find(x=>x.id===a.driverId)?.name||'-'):'بدون سائق';
+      return `<tr><td>${i+1}</td><td>${v.num}</td><td><strong>${v.name}</strong></td><td>${dn}</td><td>${v.notes||'-'}</td></tr>`;
+    }).join('')||emptyRow(5);
+  }
+  else if(type==='drivers'){
+    title='قائمة السائقين';
+    thead=`<tr><th>#</th><th>الاسم</th><th>الآلية المخصصة</th><th>ملاحظات</th></tr>`;
+    rows=D.map((d,i)=>{
+      const a=A.find(x=>x.driverId===d.id);
+      const vn=a?(V.find(x=>x.id===a.vehicleId)?.name||'-'):'بدون آلية';
+      return `<tr><td>${i+1}</td><td><strong>${d.name}</strong></td><td>${vn}</td><td>${d.notes||'-'}</td></tr>`;
+    }).join('')||emptyRow(4);
+  }
+  else if(['open','progress','done'].includes(type)){
+    const statusMap={open:'مفتوح',progress:'قيد الإصلاح',done:'مكتمل'};
+    const titleMap={open:'الأعطال المفتوحة',progress:'الأعطال قيد الإصلاح',done:'الأعطال المكتملة'};
+    title=titleMap[type];
+    thead=`<tr><th>رقم العطل</th><th>الآلية</th><th>السائق</th><th>نوع العطل</th><th>التاريخ</th><th>الحالة</th></tr>`;
+    rows=F.filter(f=>f.status===statusMap[type]).map(f=>
+      `<tr><td>${f.num}</td><td>${f.vehicleName}</td><td>${f.driver||'-'}</td><td>${f.type}</td><td>${f.date}</td><td>${statusBadge(f.status)}</td></tr>`
+    ).join('')||emptyRow(6);
+  }
+  else if(type==='works'){
+    title='الأعمال المنجزة';
+    thead=`<tr><th>رقم الإنجاز</th><th>الآلية</th><th>نوع العمل</th><th>التاريخ</th><th>المنفذ</th></tr>`;
+    rows=W.map(w=>
+      `<tr><td>${w.num}</td><td>${w.vehicleName}</td><td>${w.type}</td><td>${w.date}</td><td>${w.executor||'-'}</td></tr>`
+    ).join('')||emptyRow(5);
+  }
+
+  document.getElementById('statModalTitle').textContent = title;
+  document.getElementById('statThead').innerHTML = thead;
+  document.getElementById('statTbody').innerHTML = rows;
+  openModal('statModal');
+}
+
+// ════════ VEHICLES ════════
+function openVehicleModal(id=null){
+  document.getElementById('vehicleId').value=id||'';
+  document.getElementById('vehicleNum').value='';
+  document.getElementById('vehicleName').value='';
+  document.getElementById('vehicleNotes').value='';
+  document.getElementById('vehicleLastMaint').value='';
+  document.getElementById('vehicleNextMaint').value='';
+  document.getElementById('vImgWrap').innerHTML=`<svg><use href="#i-image"/></svg><p>انقر لرفع صورة الآلية</p>`;
+  document.getElementById('vImgInput').dataset.b64='';
+  document.getElementById('vmTitle').textContent=id?'تعديل الآلية':'إضافة آلية جديدة';
+  if(id){
+    const v=DB.vehicles().find(x=>x.id===id);
+    if(v){
+      document.getElementById('vehicleNum').value=v.num;
+      document.getElementById('vehicleName').value=v.name;
+      document.getElementById('vehicleNotes').value=v.notes||'';
+      document.getElementById('vehicleLastMaint').value=v.lastMaint||'';
+      document.getElementById('vehicleNextMaint').value=v.nextMaint||'';
+      if(v.img){ document.getElementById('vImgWrap').innerHTML=`<img src="${v.img}" style="max-height:120px;border-radius:7px;">`; document.getElementById('vImgInput').dataset.b64=v.img; }
+    }
+  }
+  openModal('vehicleModal');
+}
+
+function saveVehicle(){
+  const num=document.getElementById('vehicleNum').value.trim();
+  const name=document.getElementById('vehicleName').value.trim();
+  if(!num||!name){ toast('يرجى إدخال رقم واسم الآلية','warning'); return; }
+  const img=document.getElementById('vImgInput').dataset.b64||'';
+  const notes=document.getElementById('vehicleNotes').value.trim();
+  const lastMaint=document.getElementById('vehicleLastMaint').value;
+  const nextMaint=document.getElementById('vehicleNextMaint').value;
+  const editId=document.getElementById('vehicleId').value;
+  let vs=DB.vehicles();
+  let obj;
+  if(editId){
+    const i=vs.findIndex(x=>x.id===editId);
+    obj={...vs[i],num,name,img,notes,lastMaint,nextMaint};
+    vs[i]=obj;
+    toast('تم تعديل بيانات الآلية');
+    logActivity('عدّل', `آلية: ${name} (${num})`);
+  } else {
+    vc++; localStorage.setItem('vc',vc);
+    obj={id:uid(),num,name,img,notes,lastMaint,nextMaint};
+    vs.push(obj);
+    toast('تمت إضافة الآلية بنجاح');
+    logActivity('أضاف', `آلية: ${name} (${num})`);
+  }
+  saveV(vs); closeModal('vehicleModal'); renderVehicles();
+  fsSet('vehicles', obj.id, obj);
+}
+
+function deleteVehicle(id){
+  confirm('هل تريد حذف هذه الآلية نهائياً؟', ()=>{
+    const v=DB.vehicles().find(x=>x.id===id);
+    saveV(DB.vehicles().filter(x=>x.id!==id));
+    saveA(DB.assignments().filter(a=>a.vehicleId!==id));
+    toast('تم حذف الآلية','danger'); renderVehicles();
+    fsDelete('vehicles', id);
+    fsDelete('assignments', id);
+    logActivity('حذف', `آلية: ${v?.name||''} (${v?.num||''})`);
+  });
+}
+
+function renderVehicles(){
+  const q=(document.getElementById('vehicleSearch')?.value||'').toLowerCase();
+  const vs=DB.vehicles().filter(v=>!q||v.name.toLowerCase().includes(q)||v.num.includes(q));
+  const grid=document.getElementById('vehiclesGrid');
+  const A=DB.assignments(), D=DB.drivers();
+  if(!vs.length){
+    grid.innerHTML=`<div class="empty" style="grid-column:1/-1;"><svg><use href="#i-truck"/></svg><p>لا توجد آليات مضافة</p></div>`;
+    return;
+  }
+  grid.innerHTML=vs.map(v=>{
+    const a=A.find(x=>x.vehicleId===v.id);
+    const dn=a?(D.find(d=>d.id===a.driverId)?.name||'سائق غير موجود'):'بدون سائق';
+    return `
+    <div class="v-card">
+      <div class="v-img" onclick="${v.img?`openLightbox('${v.img}')`:''}" style="${v.img?'cursor:zoom-in;':''}">
+        ${v.img?`<img src="${v.img}" alt="${v.name}">`:`<svg><use href="#i-truck"/></svg>`}
+      </div>
+      <div class="v-body">
+        <div class="v-num">رقم الآلية: ${v.num}</div>
+        <div class="v-name">${v.name}</div>
+        <div class="v-driver"><svg><use href="#i-driver"/></svg>${dn}</div>
+        ${v.notes?`<div class="v-notes">${v.notes}</div>`:''}
+        ${maintInfo(v)}
+        <div class="v-actions">
+          <button class="btn btn-primary btn-sm" onclick="openVehicleModal('${v.id}')"><svg><use href="#i-edit"/></svg> تعديل</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteVehicle('${v.id}')"><svg><use href="#i-trash"/></svg></button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function maintInfo(v){
+  if(!v.nextMaint) return '';
+  const du = daysUntil(v.nextMaint);
+  if(du<0)  return `<div class="v-notes" style="color:var(--danger);font-weight:800;">⚠ صيانة متأخرة منذ ${Math.abs(du)} يوم</div>`;
+  if(du<=7) return `<div class="v-notes" style="color:var(--warning);font-weight:800;">⏰ الصيانة القادمة بعد ${du} يوم</div>`;
+  return `<div class="v-notes">📅 الصيانة القادمة: ${v.nextMaint}</div>`;
+}
+
+// ════════ DRIVERS ════════
+function openDriverModal(id=null){
+  document.getElementById('driverId').value=id||'';
+  document.getElementById('driverName').value='';
+  document.getElementById('driverNotes').value='';
+  document.getElementById('dmTitle').textContent=id?'تعديل السائق':'إضافة سائق جديد';
+  if(id){
+    const d=DB.drivers().find(x=>x.id===id);
+    if(d){ document.getElementById('driverName').value=d.name; document.getElementById('driverNotes').value=d.notes||''; }
+  }
+  openModal('driverModal');
+}
+
+function saveDriver(){
+  const name=document.getElementById('driverName').value.trim();
+  if(!name){ toast('يرجى إدخال اسم السائق','warning'); return; }
+  const notes=document.getElementById('driverNotes').value.trim();
+  const editId=document.getElementById('driverId').value;
+  let ds=DB.drivers();
+  let obj;
+  if(editId){
+    const i=ds.findIndex(x=>x.id===editId);
+    obj={...ds[i],name,notes};
+    ds[i]=obj;
+    toast('تم تعديل بيانات السائق');
+    logActivity('عدّل', `سائق: ${name}`);
+  } else {
+    dc++; localStorage.setItem('dc',dc);
+    obj={id:uid(),name,notes};
+    ds.push(obj);
+    toast('تمت إضافة السائق بنجاح');
+    logActivity('أضاف', `سائق: ${name}`);
+  }
+  saveD(ds); closeModal('driverModal'); renderDrivers();
+  fsSet('drivers', obj.id, obj);
+}
+
+function deleteDriver(id){
+  confirm('هل تريد حذف هذا السائق نهائياً؟', ()=>{
+    const d=DB.drivers().find(x=>x.id===id);
+    const affected=DB.assignments().filter(a=>a.driverId===id);
+    saveD(DB.drivers().filter(x=>x.id!==id));
+    saveA(DB.assignments().filter(a=>a.driverId!==id));
+    toast('تم حذف السائق','danger'); renderDrivers();
+    fsDelete('drivers', id);
+    affected.forEach(a=>fsDelete('assignments', a.vehicleId));
+    logActivity('حذف', `سائق: ${d?.name||''}`);
+  });
+}
+
+function renderDrivers(){
+  const q=(document.getElementById('driverSearch')?.value||'').toLowerCase();
+  const ds=DB.drivers().filter(d=>!q||d.name.toLowerCase().includes(q));
+  const tbody=document.getElementById('driversTbl');
+  const A=DB.assignments(), V=DB.vehicles();
+  if(!ds.length){ tbody.innerHTML=emptyRow(5,'لا يوجد سائقون مضافون'); return; }
+  tbody.innerHTML=ds.map((d,i)=>{
+    const a=A.find(x=>x.driverId===d.id);
+    const veh=a?V.find(v=>v.id===a.vehicleId):null;
+    return `<tr>
+      <td>${i+1}</td>
+      <td><strong>${d.name}</strong></td>
+      <td>${veh?`${veh.name} (${veh.num})`:'<span style="color:var(--text-muted)">بدون آلية</span>'}</td>
+      <td>${d.notes||'-'}</td>
+      <td><div class="ac">
+        <button class="btn btn-primary btn-sm" onclick="openDriverModal('${d.id}')"><svg><use href="#i-edit"/></svg></button>
+        <button class="btn btn-danger btn-sm" onclick="deleteDriver('${d.id}')"><svg><use href="#i-trash"/></svg></button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+// ════════ ASSIGNMENTS ════════
+function renderAssignments(){
+  const V=DB.vehicles(), D=DB.drivers(), A=DB.assignments();
+  const tbody=document.getElementById('assignTbl');
+  if(!V.length){ tbody.innerHTML=emptyRow(4,'أضف آليات أولاً'); }
+  else tbody.innerHTML=V.map(v=>{
+    const a=A.find(x=>x.vehicleId===v.id);
+    const cur=a?(D.find(d=>d.id===a.driverId)?.name||'غير موجود'):'بدون سائق';
+    const opts=`<option value="">-- بدون سائق --</option>`+D.map(d=>`<option value="${d.id}" ${a?.driverId===d.id?'selected':''}>${d.name}</option>`).join('');
+    return `<tr>
+      <td><strong>${v.name}</strong></td><td>${v.num}</td><td>${cur}</td>
+      <td><select class="form-control" style="width:160px;" onchange="assignDriver('${v.id}',this.value,'${v.name}')">${opts}</select></td>
+    </tr>`;
+  }).join('');
+
+  const hist=DB.history().slice().reverse().slice(0,20);
+  const histEl=document.getElementById('assignHistory');
+  if(!hist.length){ histEl.innerHTML=`<div class="empty"><svg><use href="#i-history"/></svg><p>لا يوجد سجل تغييرات بعد</p></div>`; return; }
+  histEl.innerHTML=hist.map(h=>`
+    <div class="history-item">
+      <div class="history-text">${h.vehicleName} — تم تخصيص: ${h.driverName}</div>
+      <div class="history-date">${h.time}</div>
+    </div>`).join('');
+}
+
+function assignDriver(vehicleId, driverId, vehicleName){
+  let A=DB.assignments();
+  const D=DB.drivers();
+  const driverName=driverId?(D.find(d=>d.id===driverId)?.name||''):'بدون سائق';
+  A=A.filter(a=>a.vehicleId!==vehicleId);
+  if(driverId) A=A.filter(a=>a.driverId!==driverId);
+  if(driverId) A.push({vehicleId,driverId});
+  saveA(A);
+  const H=DB.history();
+  const histEntry={vehicleId,vehicleName,driverId,driverName,time:nowStr()};
+  H.push(histEntry);
+  saveH(H);
+  toast(`تم تخصيص ${driverName} للآلية ${vehicleName}`);
+  renderAssignments();
+  if(driverId) fsSet('assignments', vehicleId, {vehicleId,driverId});
+  else fsDelete('assignments', vehicleId);
+  if(fbReady) fbDB.collection('assign_history').add({...histEntry, ts:firebase.firestore.FieldValue.serverTimestamp()}).catch(err=>console.error(err));
+  logActivity('خصّص', `${driverName} ← ${vehicleName}`);
+}
+
+// ════════ FAULTS ════════
+function populateFaultVehicles(){
+  document.getElementById('faultVehicle').innerHTML=
+    `<option value="">-- اختر الآلية --</option>`+
+    DB.vehicles().map(v=>`<option value="${v.id}">${v.name} (${v.num})</option>`).join('');
+}
+function autoFillFaultDriver(){
+  const vid=document.getElementById('faultVehicle').value;
+  const a=DB.assignments().find(x=>x.vehicleId===vid);
+  document.getElementById('faultDriver').value=a?(DB.drivers().find(d=>d.id===a.driverId)?.name||''):'';
+}
+let pendingFaultImgs = {before:'', after:''};
+function resetImgWrap(elId, label){
+  document.getElementById(elId).innerHTML = `<svg><use href="#i-image"/></svg><p>${label}</p>`;
+}
+async function openFaultModal(id=null){
+  document.getElementById('faultId').value=id||'';
+  ['faultType','faultDesc','faultDriver'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('faultDate').value=today();
+  document.getElementById('faultStatus').value='مفتوح';
+  document.getElementById('fmTitle').textContent=id?'تعديل العطل':'تسجيل عطل جديد';
+  populateFaultVehicles();
+  pendingFaultImgs={before:'',after:''};
+  resetImgWrap('fBeforeWrap','قبل الإصلاح');
+  resetImgWrap('fAfterWrap','بعد الإصلاح');
+  document.getElementById('faultPhotoNote').style.display = fbReady ? 'none':'block';
+  if(id){
+    const f=DB.faults().find(x=>x.id===id);
+    if(f){
+      document.getElementById('faultVehicle').value=f.vehicleId;
+      document.getElementById('faultDriver').value=f.driver||'';
+      document.getElementById('faultType').value=f.type;
+      document.getElementById('faultDesc').value=f.desc||'';
+      document.getElementById('faultDate').value=f.date;
+      document.getElementById('faultStatus').value=f.status;
+      if(f.hasPhotos && fbReady){
+        try{
+          const snap = await fbDB.collection('fault_photos').doc(id).get();
+          if(snap.exists){
+            const d=snap.data();
+            if(d.beforeImg){ pendingFaultImgs.before=d.beforeImg; document.getElementById('fBeforeWrap').innerHTML=`<img src="${d.beforeImg}" style="max-height:90px;border-radius:7px;">`; }
+            if(d.afterImg){ pendingFaultImgs.after=d.afterImg; document.getElementById('fAfterWrap').innerHTML=`<img src="${d.afterImg}" style="max-height:90px;border-radius:7px;">`; }
+          }
+        }catch(err){ console.error('fetch fault photos error',err); }
+      }
+    }
+  }
+  openModal('faultModal');
+}
+
+// ── IMAGE COMPRESSION (client-side, no Storage needed) ──
+function compressImageFile(file, maxDim=900, quality=0.55){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const img=new Image();
+      img.onload=()=>{
+        let w=img.width, h=img.height;
+        if(w>h && w>maxDim){ h=Math.round(h*maxDim/w); w=maxDim; }
+        else if(h>=w && h>maxDim){ w=Math.round(w*maxDim/h); h=maxDim; }
+        const canvas=document.createElement('canvas');
+        canvas.width=w; canvas.height=h;
+        canvas.getContext('2d').drawImage(img,0,0,w,h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror=()=>reject(new Error('image load failed'));
+      img.src=e.target.result;
+    };
+    reader.onerror=()=>reject(new Error('file read failed'));
+    reader.readAsDataURL(file);
+  });
+}
+async function previewFaultImg(input, kind){
+  if(!input.files[0]) return;
+  const elId = kind==='before'?'fBeforeWrap':'fAfterWrap';
+  const label = kind==='before'?'قبل الإصلاح':'بعد الإصلاح';
+  document.getElementById(elId).innerHTML = `<p style="font-size:11px;">جارٍ المعالجة...</p>`;
+  try{
+    const dataUrl = await compressImageFile(input.files[0]);
+    pendingFaultImgs[kind]=dataUrl;
+    document.getElementById(elId).innerHTML = `<img src="${dataUrl}" style="max-height:90px;border-radius:7px;">`;
+  }catch(err){
+    console.error(err);
+    toast('تعذّر معالجة الصورة','warning');
+    resetImgWrap(elId,label);
+  }
+  input.value='';
+}
+function composeBeforeAfter(beforeSrc, afterSrc){
+  return new Promise(resolve=>{
+    const srcs=[beforeSrc,afterSrc].filter(Boolean);
+    const labels=[];
+    if(beforeSrc) labels.push('قبل');
+    if(afterSrc) labels.push('بعد');
+    if(srcs.length===1){ resolve(srcs[0]); return; }
+    const images=[]; let loaded=0;
+    srcs.forEach((src,i)=>{
+      const im=new Image();
+      im.onload=()=>{ images[i]=im; loaded++; if(loaded===srcs.length) draw(); };
+      im.src=src;
+    });
+    function draw(){
+      const h=Math.max(...images.map(im=>im.height));
+      const widths=images.map(im=>im.width*(h/im.height));
+      const gap=10;
+      const totalW=widths.reduce((a,b)=>a+b,0)+gap*(images.length-1);
+      const canvas=document.createElement('canvas');
+      canvas.width=totalW; canvas.height=h;
+      const ctx=canvas.getContext('2d');
+      let x=0;
+      images.forEach((im,i)=>{
+        const w=widths[i];
+        ctx.drawImage(im,x,0,w,h);
+        ctx.fillStyle='rgba(0,0,0,.6)'; ctx.fillRect(x,h-30,w,30);
+        ctx.fillStyle='#fff'; ctx.font='bold 18px Cairo, sans-serif'; ctx.textAlign='center';
+        ctx.fillText(labels[i]||'', x+w/2, h-9);
+        x+=w+gap;
+      });
+      resolve(canvas.toDataURL('image/jpeg',0.85));
+    }
+  });
+}
+async function viewFaultPhotos(id){
+  if(!fbReady){ toast('عرض الصور يتطلب اتصالاً بـ Firebase','warning'); return; }
+  try{
+    const snap = await fbDB.collection('fault_photos').doc(id).get();
+    if(!snap.exists){ toast('لا توجد صور مرفقة لهذا العطل','info'); return; }
+    const d=snap.data();
+    const composed = await composeBeforeAfter(d.beforeImg, d.afterImg);
+    openLightbox(composed);
+  }catch(err){ console.error(err); toast('تعذّر جلب الصور','warning'); }
+}
+async function saveFault(){
+  const vid=document.getElementById('faultVehicle').value;
+  const type=document.getElementById('faultType').value.trim();
+  if(!vid||!type){ toast('يرجى اختيار الآلية وإدخال نوع العطل','warning'); return; }
+  const v=DB.vehicles().find(x=>x.id===vid);
+  const driver=document.getElementById('faultDriver').value;
+  const desc=document.getElementById('faultDesc').value.trim();
+  const date=document.getElementById('faultDate').value;
+  const status=document.getElementById('faultStatus').value;
+  const editId=document.getElementById('faultId').value;
+  const hasPhotos=!!(pendingFaultImgs.before||pendingFaultImgs.after);
+  if(hasPhotos && !fbReady) toast('تنبيه: الصور لن تُحفظ بدون اتصال بـ Firebase','warning');
+  const btn=document.getElementById('faultSaveBtn');
+  btn.disabled=true; btn.style.opacity='.6';
+  try{
+    let fs=DB.faults();
+    let obj, faultId;
+    if(editId){
+      faultId=editId;
+      const i=fs.findIndex(x=>x.id===faultId);
+      obj={...fs[i],vehicleId:vid,vehicleName:v?.name||'',driver,type,desc,date,status,hasPhotos:hasPhotos||fs[i].hasPhotos||false};
+      fs[i]=obj;
+      toast('تم تعديل العطل');
+      logActivity('عدّل', `عطل: ${type} — ${v?.name||''}`);
+    } else {
+      fc++; localStorage.setItem('fc',fc);
+      const num = await nextWONum();
+      faultId=uid();
+      obj={id:faultId,num,vehicleId:vid,vehicleName:v?.name||'',driver,type,desc,date,status,hasPhotos};
+      fs.push(obj);
+      toast('تم تسجيل العطل');
+      logActivity('أضاف', `عطل: ${type} — ${v?.name||''}`);
+    }
+    saveF(fs); closeModal('faultModal'); renderFaults();
+    fsSet('faults', faultId, obj);
+    if(fbReady && hasPhotos){
+      fsSet('fault_photos', faultId, {beforeImg:pendingFaultImgs.before||'', afterImg:pendingFaultImgs.after||'', updatedAt:Date.now()});
+    }
+  } finally {
+    btn.disabled=false; btn.style.opacity='1';
+  }
+}
+function deleteFault(id){
+  confirm('هل تريد حذف هذا العطل نهائياً؟', ()=>{
+    const f=DB.faults().find(x=>x.id===id);
+    saveF(DB.faults().filter(x=>x.id!==id));
+    toast('تم حذف العطل','danger'); renderFaults();
+    fsDelete('faults', id);
+    fsDelete('fault_photos', id);
+    logActivity('حذف', `عطل: ${f?.type||''} — ${f?.vehicleName||''}`);
+  });
+}
+let faultFilterStatus = '';
+function setFaultFilter(status, el){
+  faultFilterStatus = status;
+  document.querySelectorAll('#faultStatusTabs .tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  renderFaults();
+}
+function renderFaults(){
+  const q=(document.getElementById('faultSearch')?.value||'').toLowerCase();
+  const allF=DB.faults();
+  document.getElementById('cntAll').textContent  = allF.length;
+  document.getElementById('cntOpen').textContent = allF.filter(f=>f.status==='مفتوح').length;
+  document.getElementById('cntProg').textContent = allF.filter(f=>f.status==='قيد الإصلاح').length;
+  document.getElementById('cntDone').textContent = allF.filter(f=>f.status==='مكتمل').length;
+  let fs=allF;
+  if(faultFilterStatus) fs=fs.filter(f=>f.status===faultFilterStatus);
+  if(q) fs=fs.filter(f=>(f.vehicleName||'').toLowerCase().includes(q)||(f.type||'').toLowerCase().includes(q)||(f.driver||'').toLowerCase().includes(q)||(f.desc||'').toLowerCase().includes(q)||(f.num||'').toLowerCase().includes(q));
+  const tbody=document.getElementById('faultsTbl');
+  if(!fs.length){ tbody.innerHTML=emptyRow(8,'لا توجد أعطال مسجلة'); return; }
+  tbody.innerHTML=fs.slice().reverse().map(f=>`
+    <tr>
+      <td>${f.num}</td><td>${f.vehicleName}</td><td>${f.driver||'-'}</td><td>${f.type}</td>
+      <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${f.desc||'-'}</td>
+      <td>${f.date}</td><td>${statusBadge(f.status)}${overdueTag(f)}</td>
+      <td><div class="ac">
+        ${f.hasPhotos?`<button class="btn btn-outline btn-sm" onclick="viewFaultPhotos('${f.id}')" title="عرض الصور"><svg><use href="#i-image"/></svg></button>`:''}
+        <button class="btn btn-primary btn-sm" onclick="openFaultModal('${f.id}')"><svg><use href="#i-edit"/></svg></button>
+        <button class="btn btn-danger btn-sm" onclick="deleteFault('${f.id}')"><svg><use href="#i-trash"/></svg></button>
+      </div></td>
+    </tr>`).join('');
+}
+
+// ════════ WORKS ════════
+function populateWorkVehicles(){
+  document.getElementById('workVehicle').innerHTML=
+    `<option value="">-- اختر الآلية --</option>`+
+    DB.vehicles().map(v=>`<option value="${v.id}">${v.name} (${v.num})</option>`).join('');
+}
+function openWorkModal(id=null){
+  document.getElementById('workId').value=id||'';
+  ['workType','workDesc','workExecutor','workNotes'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('workDate').value=today();
+  document.getElementById('wkTitle').textContent=id?'تعديل الإنجاز':'إضافة عمل منجز';
+  populateWorkVehicles();
+  if(id){
+    const w=DB.works().find(x=>x.id===id);
+    if(w){
+      document.getElementById('workVehicle').value=w.vehicleId;
+      document.getElementById('workType').value=w.type;
+      document.getElementById('workDesc').value=w.desc||'';
+      document.getElementById('workDate').value=w.date;
+      document.getElementById('workExecutor').value=w.executor||'';
+      document.getElementById('workNotes').value=w.notes||'';
+    }
+  }
+  openModal('workModal');
+}
+async function saveWork(){
+  const vid=document.getElementById('workVehicle').value;
+  const type=document.getElementById('workType').value.trim();
+  if(!vid||!type){ toast('يرجى اختيار الآلية وإدخال نوع العمل','warning'); return; }
+  const v=DB.vehicles().find(x=>x.id===vid);
+  const desc=document.getElementById('workDesc').value.trim();
+  const date=document.getElementById('workDate').value;
+  const executor=document.getElementById('workExecutor').value.trim();
+  const notes=document.getElementById('workNotes').value.trim();
+  const editId=document.getElementById('workId').value;
+  let ws=DB.works();
+  let obj, workId;
+  if(editId){
+    workId=editId;
+    const i=ws.findIndex(x=>x.id===workId);
+    obj={...ws[i],vehicleId:vid,vehicleName:v?.name||'',type,desc,date,executor,notes};
+    ws[i]=obj;
+    toast('تم تعديل الإنجاز');
+    logActivity('عدّل', `إنجاز: ${type} — ${v?.name||''}`);
+  } else {
+    wc++; localStorage.setItem('wc',wc);
+    const num = await nextWONum();
+    workId=uid();
+    obj={id:workId,num,vehicleId:vid,vehicleName:v?.name||'',type,desc,date,executor,notes};
+    ws.push(obj);
+    toast('تمت إضافة الإنجاز');
+    logActivity('أضاف', `إنجاز: ${type} — ${v?.name||''}`);
+  }
+  saveW(ws); closeModal('workModal'); renderWorks();
+  fsSet('works', workId, obj);
+}
+function deleteWork(id){
+  confirm('هل تريد حذف هذا الإنجاز نهائياً؟', ()=>{
+    const w=DB.works().find(x=>x.id===id);
+    saveW(DB.works().filter(x=>x.id!==id));
+    toast('تم حذف الإنجاز','danger'); renderWorks();
+    fsDelete('works', id);
+    logActivity('حذف', `إنجاز: ${w?.type||''} — ${w?.vehicleName||''}`);
+  });
+}
+function renderWorks(){
+  const q=(document.getElementById('workSearch')?.value||'').toLowerCase();
+  let ws=DB.works();
+  if(q) ws=ws.filter(w=>(w.vehicleName||'').toLowerCase().includes(q)||(w.type||'').toLowerCase().includes(q)||(w.executor||'').toLowerCase().includes(q));
+  const tbody=document.getElementById('worksTbl');
+  if(!ws.length){ tbody.innerHTML=emptyRow(8,'لا توجد أعمال مسجلة'); return; }
+  tbody.innerHTML=ws.slice().reverse().map(w=>`
+    <tr>
+      <td>${w.num}</td><td>${w.vehicleName}</td><td>${w.type}</td>
+      <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${w.desc||'-'}</td>
+      <td>${w.date}</td><td>${w.executor||'-'}</td><td>${w.notes||'-'}</td>
+      <td><div class="ac">
+        <button class="btn btn-primary btn-sm" onclick="openWorkModal('${w.id}')"><svg><use href="#i-edit"/></svg></button>
+        <button class="btn btn-danger btn-sm" onclick="deleteWork('${w.id}')"><svg><use href="#i-trash"/></svg></button>
+      </div></td>
+    </tr>`).join('');
+}
+
+// ════════ REPORTS ════════
+let currentTab = 'r-vehicles';
+
+function switchReportTab(el, tab){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  showReportTab(tab);
+}
+
+function populateReportVehicles(){
+  document.getElementById('rVehicle').innerHTML=
+    `<option value="">جميع الآليات</option>`+
+    DB.vehicles().map(v=>`<option value="${v.id}">${v.name}</option>`).join('');
+}
+
+function buildTable(headers, rows, title){
+  return `<h3 style="font-size:14px;font-weight:900;margin-bottom:12px;color:var(--text);">${title}</h3>
+  <div class="table-wrap"><table>
+    <thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
+    <tbody>${rows||emptyRow(headers.length)}</tbody>
+  </table></div>`;
+}
+
+function showReportTab(tab){
+  currentTab=tab;
+  document.getElementById('reportFilters').style.display = tab==='r-filter'?'flex':'none';
+  const V=DB.vehicles(), D=DB.drivers(), F=DB.faults(), W=DB.works(), A=DB.assignments();
+  const el=document.getElementById('reportContent');
+
+  if(tab==='r-vehicles'){
+    const rows=V.map((v,i)=>{
+      const a=A.find(x=>x.vehicleId===v.id);
+      const dn=a?(D.find(x=>x.id===a.driverId)?.name||'-'):'بدون سائق';
+      return `<tr><td>${i+1}</td><td>${v.num}</td><td>${v.name}</td><td>${dn}</td><td>${v.notes||'-'}</td></tr>`;
+    }).join('');
+    el.innerHTML=buildTable(['#','الرقم','الاسم','السائق المخصص','ملاحظات'],rows,'تقرير جميع الآليات');
+  }
+  else if(tab==='r-drivers'){
+    const rows=D.map((d,i)=>{
+      const a=A.find(x=>x.driverId===d.id);
+      const vn=a?(V.find(x=>x.id===a.vehicleId)?.name||'-'):'بدون آلية';
+      return `<tr><td>${i+1}</td><td>${d.name}</td><td>${vn}</td><td>${d.notes||'-'}</td></tr>`;
+    }).join('');
+    el.innerHTML=buildTable(['#','الاسم','الآلية المخصصة','ملاحظات'],rows,'تقرير جميع السائقين');
+  }
+  else if(tab==='r-open'){
+    const rows=F.filter(f=>f.status==='مفتوح').map((f,i)=>
+      `<tr><td>${i+1}</td><td>${f.num}</td><td>${f.vehicleName}</td><td>${f.driver||'-'}</td><td>${f.type}</td><td>${f.date}</td></tr>`
+    ).join('');
+    el.innerHTML=buildTable(['#','رقم العطل','الآلية','السائق','نوع العطل','التاريخ'],rows,'تقرير الأعطال المفتوحة');
+  }
+  else if(tab==='r-done'){
+    const rows=F.filter(f=>f.status==='مكتمل').map((f,i)=>
+      `<tr><td>${i+1}</td><td>${f.num}</td><td>${f.vehicleName}</td><td>${f.driver||'-'}</td><td>${f.type}</td><td>${f.date}</td></tr>`
+    ).join('');
+    el.innerHTML=buildTable(['#','رقم العطل','الآلية','السائق','نوع العطل','التاريخ'],rows,'تقرير الأعطال المكتملة');
+  }
+  else if(tab==='r-works'){
+    const rows=W.map((w,i)=>
+      `<tr><td>${i+1}</td><td>${w.num}</td><td>${w.vehicleName}</td><td>${w.type}</td><td>${w.date}</td><td>${w.executor||'-'}</td></tr>`
+    ).join('');
+    el.innerHTML=buildTable(['#','الرقم','الآلية','نوع العمل','التاريخ','المنفذ'],rows,'تقرير الأعمال المنجزة');
+  }
+}
+
+function renderCustomReport(){
+  const from=document.getElementById('rDateFrom').value;
+  const to=document.getElementById('rDateTo').value;
+  const vid=document.getElementById('rVehicle').value;
+  const sec=document.getElementById('rSection').value;
+  let data=sec==='faults'?DB.faults():DB.works();
+  if(vid) data=data.filter(r=>r.vehicleId===vid);
+  if(from) data=data.filter(r=>r.date>=from);
+  if(to) data=data.filter(r=>r.date<=to);
+  const el=document.getElementById('reportContent');
+  if(sec==='faults'){
+    const rows=data.map((f,i)=>`<tr><td>${i+1}</td><td>${f.num}</td><td>${f.vehicleName}</td><td>${f.driver||'-'}</td><td>${f.type}</td><td>${f.date}</td><td>${f.status}</td></tr>`).join('');
+    el.innerHTML=buildTable(['#','رقم العطل','الآلية','السائق','النوع','التاريخ','الحالة'],rows,'تقرير مخصص — الأعطال');
+  } else {
+    const rows=data.map((w,i)=>`<tr><td>${i+1}</td><td>${w.num}</td><td>${w.vehicleName}</td><td>${w.type}</td><td>${w.date}</td><td>${w.executor||'-'}</td></tr>`).join('');
+    el.innerHTML=buildTable(['#','الرقم','الآلية','نوع العمل','التاريخ','المنفذ'],rows,'تقرير مخصص — الأعمال المنجزة');
+  }
+}
+
+function printReport(){ window.print(); }
+function exportPDF(){ toast('جارٍ تصدير PDF...','info'); setTimeout(()=>window.print(),300); }
+
+function exportExcel(){
+  let data=[]; let title='تقرير';
+  const V=DB.vehicles(), D=DB.drivers(), A=DB.assignments();
+  if(currentTab==='r-vehicles'){
+    title='الآليات';
+    data=V.map(v=>{ const a=A.find(x=>x.vehicleId===v.id); const dn=a?(D.find(x=>x.id===a.driverId)?.name||''):''; return {'رقم الآلية':v.num,'اسم الآلية':v.name,'السائق':dn,'ملاحظات':v.notes||''}; });
+  } else if(currentTab==='r-drivers'){
+    title='السائقون';
+    data=D.map(d=>{ const a=A.find(x=>x.driverId===d.id); const vn=a?(V.find(x=>x.id===a.vehicleId)?.name||''):''; return {'الاسم':d.name,'الآلية':vn,'ملاحظات':d.notes||''}; });
+  } else if(currentTab==='r-open'){
+    title='الأعطال المفتوحة';
+    data=DB.faults().filter(f=>f.status==='مفتوح').map(f=>({'رقم العطل':f.num,'الآلية':f.vehicleName,'السائق':f.driver||'','نوع العطل':f.type,'التاريخ':f.date}));
+  } else if(currentTab==='r-done'){
+    title='الأعطال المكتملة';
+    data=DB.faults().filter(f=>f.status==='مكتمل').map(f=>({'رقم العطل':f.num,'الآلية':f.vehicleName,'السائق':f.driver||'','نوع العطل':f.type,'التاريخ':f.date}));
+  } else if(currentTab==='r-works'){
+    title='الأعمال المنجزة';
+    data=DB.works().map(w=>({'الرقم':w.num,'الآلية':w.vehicleName,'نوع العمل':w.type,'التاريخ':w.date,'المنفذ':w.executor||''}));
+  } else { toast('يرجى اختيار تقرير أولاً','warning'); return; }
+  if(!data.length){ toast('لا توجد بيانات للتصدير','warning'); return; }
+  const ws=XLSX.utils.json_to_sheet(data);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,title);
+  XLSX.writeFile(wb,`تقرير_${title}_${today()}.xlsx`);
+  toast('تم تصدير ملف Excel بنجاح');
+}
+
+// ════════ GLOBAL SEARCH ════════
+function globalSearchFn(q){
+  const box=document.getElementById('gsrBox');
+  q=q.trim();
+  if(!q){ box.innerHTML=''; box.style.display='none'; return; }
+  const ql=q.toLowerCase();
+  const V=DB.vehicles(), D=DB.drivers(), F=DB.faults(), W=DB.works();
+
+  const vs=V.filter(v=>v.name.toLowerCase().includes(ql)||v.num.toLowerCase().includes(ql)).slice(0,5);
+  const ds=D.filter(d=>d.name.toLowerCase().includes(ql)).slice(0,5);
+  const fs=F.filter(f=>(f.type||'').toLowerCase().includes(ql)||(f.desc||'').toLowerCase().includes(ql)||(f.num||'').toLowerCase().includes(ql)||(f.vehicleName||'').toLowerCase().includes(ql)).slice(0,5);
+  const ws=W.filter(w=>(w.type||'').toLowerCase().includes(ql)||(w.desc||'').toLowerCase().includes(ql)||(w.num||'').toLowerCase().includes(ql)||(w.vehicleName||'').toLowerCase().includes(ql)).slice(0,5);
+
+  let html='';
+  if(vs.length) html+=`<div class="gsr-group">آليات</div>`+vs.map(v=>`<div class="gsr-item" onclick="goToVehicle('${v.id}')">${v.name} <span style="opacity:.6">(${v.num})</span></div>`).join('');
+  if(ds.length) html+=`<div class="gsr-group">سائقون</div>`+ds.map(d=>`<div class="gsr-item" onclick="goToDriver('${d.id}')">${d.name}</div>`).join('');
+  if(fs.length) html+=`<div class="gsr-group">أعطال</div>`+fs.map(f=>`<div class="gsr-item" onclick="goToFault('${f.id}')">${f.num} — ${f.type} <span style="opacity:.6">(${f.vehicleName})</span></div>`).join('');
+  if(ws.length) html+=`<div class="gsr-group">أعمال منجزة</div>`+ws.map(w=>`<div class="gsr-item" onclick="goToWork('${w.id}')">${w.num} — ${w.type} <span style="opacity:.6">(${w.vehicleName})</span></div>`).join('');
+  if(!html) html=`<div class="gsr-empty">لا توجد نتائج مطابقة</div>`;
+
+  box.innerHTML=html;
+  box.style.display='block';
+}
+function closeGSR(){
+  document.getElementById('gsrBox').style.display='none';
+  document.getElementById('globalSearch').value='';
+}
+function goToVehicle(id){
+  closeGSR(); showSection('vehicles');
+  const v=DB.vehicles().find(x=>x.id===id);
+  document.getElementById('vehicleSearch').value = v?v.num:'';
+  renderVehicles();
+}
+function goToDriver(id){
+  closeGSR(); showSection('drivers');
+  const d=DB.drivers().find(x=>x.id===id);
+  document.getElementById('driverSearch').value = d?d.name:'';
+  renderDrivers();
+}
+function goToFault(id){
+  closeGSR(); showSection('faults');
+  const f=DB.faults().find(x=>x.id===id);
+  setFaultFilter('', document.querySelector('#faultStatusTabs .tab'));
+  document.getElementById('faultSearch').value = f?f.num:'';
+  renderFaults();
+}
+function goToWork(id){
+  closeGSR(); showSection('works');
+  const w=DB.works().find(x=>x.id===id);
+  document.getElementById('workSearch').value = w?w.num:'';
+  renderWorks();
+}
+document.addEventListener('click', e=>{
+  const wrap=document.getElementById('globalSearch')?.closest('.search-wrap');
+  if(wrap && !wrap.contains(e.target)) closeGSR();
+});
+
+// ════════ BACKUP ════════
+function backupData(){
+  const data={
+    vehicles:DB.vehicles(), drivers:DB.drivers(), faults:DB.faults(),
+    works:DB.works(), assignments:DB.assignments(), history:DB.history(),
+    counters:{vc,dc,fc,wc,woSeq:JSON.parse(localStorage.getItem('woSeq')||'{}')}
+  };
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+  a.download=`نسخة_احتياطية_${today()}.json`;
+  a.click();
+  toast('تم تصدير النسخة الاحتياطية بنجاح');
+}
+
+function restoreData(input){
+  const file=input.files[0]; if(!file) return;
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      const d=JSON.parse(e.target.result);
+      if(d.vehicles)  saveV(d.vehicles);
+      if(d.drivers)   saveD(d.drivers);
+      if(d.faults)    saveF(d.faults);
+      if(d.works)     saveW(d.works);
+      if(d.assignments) saveA(d.assignments);
+      if(d.history)   saveH(d.history);
+      if(d.counters){ vc=d.counters.vc||0; dc=d.counters.dc||0; fc=d.counters.fc||0; wc=d.counters.wc||0; ['vc','dc','fc','wc'].forEach(k=>localStorage.setItem(k,d.counters[k]||0)); if(d.counters.woSeq) localStorage.setItem('woSeq', JSON.stringify(d.counters.woSeq)); }
+      toast('تمت استعادة البيانات بنجاح'); renderDashboard();
+    }catch{ toast('ملف غير صالح أو تالف','danger'); }
+  };
+  r.readAsText(file); input.value='';
+}
+
+function clearAll(){
+  confirm('سيتم حذف جميع البيانات بشكل نهائي ولا يمكن التراجع. هل أنت متأكد؟', ()=>{
+    ['sys_v','sys_d','sys_f','sys_w','sys_a','sys_h','vc','dc','fc','wc','woSeq'].forEach(k=>localStorage.removeItem(k));
+    vc=dc=fc=wc=0;
+    toast('تم حذف جميع البيانات','danger'); renderDashboard();
+  });
+}
+
+// ════════ INIT ════════
+document.addEventListener('DOMContentLoaded', ()=>{
+  if(localStorage.getItem('darkMode')==='true'){
+    document.body.classList.add('dark');
+    document.getElementById('darkToggle').classList.add('on');
+    document.getElementById('darkToggle2').classList.add('on');
+  }
+  renderDashboard();
+  initFirebase();
+});
+</script>
+</body>
+</html>
